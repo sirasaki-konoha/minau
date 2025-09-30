@@ -29,6 +29,7 @@ pub async fn play_music<P: AsRef<Path>>(path: P) {
         player.channels()
     );
     crate::display_info::display_info(filename, &metadata);
+    println!();
 
     let playing = tokio::spawn(async { player.play() });
     let key_thread = tokio::spawn(async { get_input() });

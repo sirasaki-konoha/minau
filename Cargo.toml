@@ -1,0 +1,12 @@
+[package]
+name = "minau"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.48", features = ["derive"] }
+crossterm = "0.29.0"
+humantime = "2.3.0"
+lofty = "0.22.4"
+rodio = "0.21.1"
+tokio = { version = "1.47.1", features = ["full"] }

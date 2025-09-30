@@ -33,7 +33,7 @@ pub fn deinit() {
     });
 }
 
-pub fn get_input() {
+pub async fn get_input() {
     init_terminal();
     loop {
         if poll(Duration::from_millis(100)).unwrap() {

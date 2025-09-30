@@ -1,3 +1,4 @@
+use crate::info::info;
 use crate::input::{deinit, get_input, init_terminal};
 use crate::{
     err,
@@ -32,16 +33,15 @@ pub async fn play_music<P: AsRef<Path>>(path: P) {
     println!();
 
     let playing = tokio::spawn(async { player.play() });
-    let key_thread = tokio::spawn(async { get_input() });
+    let key_thread = tokio::spawn(get_input());
     let duration = Duration::from_secs(metadata.duration().as_secs());
     let mut current_secs = 0;
 
     loop {
         if playing.is_finished() {
-            key_thread.abort();
             println!();
             deinit();
-            return;
+            exit(0);
         }
         display_status(duration, Duration::from_secs(current_secs));
         sleep(Duration::from_secs(1)).await;

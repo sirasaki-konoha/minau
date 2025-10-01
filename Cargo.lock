@@ -603,6 +603,7 @@ dependencies = [
  "humantime",
  "indicatif",
  "lofty",
+ "once_cell",
  "rodio",
  "tokio",
 ]

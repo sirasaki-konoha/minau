@@ -1,10 +1,14 @@
-use crate::{err, info::info, player::play::MusicPlay};
+use crate::{
+    err,
+    info::{info, info_with_restore},
+    player::{metadata::MetaData, play::MusicPlay},
+};
 use crossterm::{
-    cursor::{Hide, Show},
-    event::{Event, KeyCode, poll, read},
+    cursor::{Hide, MoveToPreviousLine, Show},
+    event::{poll, read, Event, KeyCode},
     execute,
     style::Stylize,
-    terminal::{disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, Clear},
 };
 use std::{
     io::stdout,
@@ -37,7 +41,12 @@ pub fn deinit() {
     });
 }
 
-pub async fn get_input(music_play: Arc<Mutex<MusicPlay>>, quit: Arc<Mutex<bool>>) {
+pub async fn get_input(
+    music_play: Arc<Mutex<MusicPlay>>,
+    quit: Arc<Mutex<bool>>,
+    filename: String,
+    metadata: MetaData,
+) {
     init_terminal();
     loop {
         if *quit.lock().unwrap() {
@@ -60,43 +69,71 @@ pub async fn get_input(music_play: Arc<Mutex<MusicPlay>>, quit: Arc<Mutex<bool>>
                     }
                     KeyCode::Char('>') | KeyCode::Char('l') => {
                         info("Next track");
+                        execute!(
+                            std::io::stdout(),
+                            MoveToPreviousLine(2),
+                            Clear(crossterm::terminal::ClearType::CurrentLine),
+                        ).unwrap();
                         return;
                     }
                     KeyCode::Char(' ') => {
                         let mut play = music_play.lock().unwrap();
                         if play.is_paused() {
                             play.resume();
-                            info("Resumed");
+                            info_with_restore("Resumed", filename.clone(), metadata.clone());
                         } else {
                             play.pause();
-                            info("Paused");
+                            info_with_restore("Paused", filename.clone(), metadata.clone());
                         }
                     }
                     KeyCode::Char('+') | KeyCode::Char('=') => {
                         let mut play = music_play.lock().unwrap();
                         let vol = play.get_volume();
-                        if vol == 1.0 {
-                            info(format!("{}", "Already at maximum volume!".red()));
+                        if vol >= 1.0 {
+                            info_with_restore(
+                                &format!("{}", "Already at maximum volume!".red()),
+                                filename.clone(),
+                                metadata.clone(),
+                            );
+                            play.set_volume_mut(1.0);
                         } else {
-                            play.set_volume_mut(vol + 0.1);
-                            let formated = (vol * 100.0).round() as u16;
-                            info(&format!("Volme set to {}", formated));
+                            let new_vol = vol + 0.1;
+                            play.set_volume_mut(new_vol);
+                            let formated = (new_vol * 100.0).round() as u16;
+                            info_with_restore(
+                                &format!("Volume set to {}", formated.to_string().cyan()),
+                                filename.clone(),
+                                metadata.clone(),
+                            );
                         }
                     }
 
                     KeyCode::Char('-') | KeyCode::Char('_') => {
                         let mut play = music_play.lock().unwrap();
                         let vol = play.get_volume();
-                        if vol < 0.0 {
-                            info(format!("{}", "Already at minimum volume!".red()));
+                        if vol <= 0.0 {
+                            info_with_restore(
+                                &format!("{}", "Already at minimum volume!".red()),
+                                filename.clone(),
+                                metadata.clone(),
+                            );
                         } else {
-                            play.set_volume_mut(vol - 0.1);
-                            let formated = (vol * 100.0).round() as u16;
-                            info(&format!("Volme set to {}", formated));
+                            let new_vol = vol - 0.1;
+                            play.set_volume_mut(new_vol);
+                            let formated = (new_vol * 100.0).round() as u16;
+                            info_with_restore(
+                                &format!("Volume set to {}", formated.to_string().cyan()),
+                                filename.clone(),
+                                metadata.clone(),
+                            );
                         }
                     }
                     KeyCode::Char(c) => {
-                        info(format!("Unknown key: {}", c));
+                        info_with_restore(
+                            &format!("Unknown key: {}", c.red()),
+                            filename.clone(),
+                            metadata.clone(),
+                        );
                     }
                     _ => {}
                 }

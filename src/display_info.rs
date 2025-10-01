@@ -9,7 +9,7 @@ enum Infos {
 }
 
 pub fn display_info(filename: &str, metadata: &MetaData) {
-    let mut current = format!("Playing: ");
+    let mut current = String::new();
     let mut infos = vec![Infos::None];
 
     if let Some(album) = metadata.album() {

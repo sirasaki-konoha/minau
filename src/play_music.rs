@@ -1,6 +1,9 @@
 use crate::info::info;
 use crate::input::{deinit, get_input};
 use crate::player::player::Player;
+use crossterm::cursor::MoveToPreviousLine;
+use crossterm::execute;
+use crossterm::terminal::Clear;
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::Path;
@@ -13,30 +16,40 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
     let metadata = player.metadata();
     let filename = path.as_ref().file_name().unwrap().to_str().unwrap();
 
-    println!("{}K/{}ch", player.sample_rate(), player.channels());
+    let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
+    println!(
+        "{}kHz/{}ch | {}",
+        sample_rate_khz,
+        player.channels(),
+        format_duration(Duration::from_secs(metadata.duration().as_secs()))
+    );
     crate::display_info::display_info(filename, &metadata);
-    println!("Welcome to minau!");
 
     let music_play = Arc::new(Mutex::new(player.play().set_volume(volume)));
     let music_play_clone = Arc::clone(&music_play);
     let key_state = Arc::new(Mutex::new(false));
     let key_state_clone = Arc::clone(&key_state);
-    let key_thread = tokio::spawn(get_input(music_play_clone, key_state_clone));
+    let key_thread = tokio::spawn(get_input(
+        music_play_clone,
+        key_state_clone,
+        filename.to_string(),
+        metadata.clone(),
+    ));
     let duration = metadata.duration().as_secs();
     let mut current_secs = 0;
     let pb = ProgressBar::new(duration);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("[{bar:40.cyan/blue}] {msg}")
+            .template("{bar:40.cyan/blue} {msg}")
             .unwrap()
-            .progress_chars("#>-"),
+            .progress_chars("=> "),
     );
 
     pb.set_position(0);
     pb.set_message(format!(
-        "{}/{}",
-        format_duration(Duration::from_secs(duration)),
-        format_duration(Duration::from_secs(current_secs))
+        "{} / {}",
+        format_duration(Duration::from_secs(current_secs)),
+        format_duration(Duration::from_secs(duration))
     ));
     let mut tick_count = 0;
 
@@ -54,12 +67,17 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
             let mut key = key_state.lock().unwrap();
             *key = true;
             info(format!(
-                "{}/{} (finish)",
-                format_duration(Duration::from_secs(duration)),
-                format_duration(Duration::from_secs(current_secs))
+                "{} / {}",
+                format_duration(Duration::from_secs(current_secs)),
+                format_duration(Duration::from_secs(duration))
             ));
             pb.finish_and_clear();
             deinit();
+            execute!(
+                std::io::stdout(),
+                MoveToPreviousLine(2),
+                Clear(crossterm::terminal::ClearType::CurrentLine),
+            ).unwrap();
             return;
         }
 
@@ -74,7 +92,7 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
                 current_secs += 1;
                 pb.set_position(current_secs);
                 pb.set_message(format!(
-                    "{}/{}",
+                    "{} / {}",
                     format_duration(Duration::from_secs(current_secs)),
                     format_duration(Duration::from_secs(duration))
                 ));

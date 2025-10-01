@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::err;
 
+#[derive(Clone)]
 pub struct MetaData {
     pub tag: Tag,
     pub prop: FileProperties,

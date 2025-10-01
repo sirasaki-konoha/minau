@@ -7,7 +7,20 @@ use crate::err;
 
 pub struct Player {
     pub decoder: Decoder<BufReader<File>>,
+    pub file: File,
     pub path: String,
+}
+
+impl Clone for Player {
+    fn clone(&self) -> Self {
+        let decoder = Decoder::new(BufReader::new(self.file.try_clone().unwrap())).unwrap();
+
+        Self {
+            decoder,
+            file: self.file.try_clone().unwrap(),
+            path: self.path.clone(),
+        }
+    }
 }
 
 impl Player {
@@ -19,11 +32,15 @@ impl Player {
             exit(1);
         });
 
-        let decoder = Decoder::new(BufReader::new(file)).unwrap_or_else(|e| {
+        let decoder = Decoder::new(BufReader::new(file.try_clone().unwrap())).unwrap_or_else(|e| {
             err!("Failed to decode {}: {}", path, e);
             exit(1);
         });
 
-        Player { decoder, path }
+        Player {
+            decoder,
+            file,
+            path,
+        }
     }
 }

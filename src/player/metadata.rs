@@ -72,9 +72,10 @@ impl MetaData {
     }
 
     /// returns first of picture data
-    pub fn picture(&self) -> Vec<u8> {
-        let picture = self.tag.pictures()[0].clone();
-
-        picture.data().to_vec()
+    pub fn picture(&self) -> Option<Vec<u8>> {
+        if let Some(s) = self.tag.pictures().get(0) {
+            return Some(s.data().to_vec());
+        }
+        None
     }
 }

@@ -14,6 +14,7 @@
 //! * **files: `<Vec<String>>`** — Accepts music files to play (multiple files can be specified).
 //! * **volume** — Adjusts the playback volume. The maximum is 100 and the minimum is 1.
 
+mod display_image;
 mod display_info;
 mod info;
 mod input;
@@ -24,6 +25,7 @@ use std::process::exit;
 
 use clap::Parser;
 
+/// A simple, minimal music player
 #[derive(Parser)]
 struct Cli {
     /// Files to play (multiple selections allowed)
@@ -31,6 +33,9 @@ struct Cli {
     /// Specify the default playback volume (minimum: 1, maximum: 100)
     #[arg(short, long)]
     volume: Option<u16>,
+    /// Display album art in a GUI
+    #[arg(short, long)]
+    gui: bool,
 }
 
 #[tokio::main]
@@ -54,6 +59,6 @@ async fn main() {
     }
 
     for path in args.files {
-        play_music::play_music(path, volume).await;
+        play_music::play_music(path, volume, args.gui).await;
     }
 }

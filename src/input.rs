@@ -5,10 +5,10 @@ use crate::{
 };
 use crossterm::{
     cursor::{Hide, MoveToPreviousLine, Show},
-    event::{poll, read, Event, KeyCode},
+    event::{Event, KeyCode, poll, read},
     execute,
     style::Stylize,
-    terminal::{disable_raw_mode, enable_raw_mode, Clear},
+    terminal::{Clear, disable_raw_mode, enable_raw_mode},
 };
 use std::{
     io::stdout,
@@ -73,7 +73,8 @@ pub async fn get_input(
                             std::io::stdout(),
                             MoveToPreviousLine(2),
                             Clear(crossterm::terminal::ClearType::CurrentLine),
-                        ).unwrap();
+                        )
+                        .unwrap();
                         return;
                     }
                     KeyCode::Char(' ') => {

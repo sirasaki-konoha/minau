@@ -1,21 +1,55 @@
+use crate::display_image;
 use crate::info::info;
 use crate::input::{deinit, get_input};
+use crate::player::metadata::MetaData;
 use crate::player::player::Player;
 use crossterm::cursor::MoveToPreviousLine;
 use crossterm::execute;
 use crossterm::terminal::Clear;
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::env;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 
-pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
+pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let player = Player::new(&path);
     let metadata = player.metadata();
-    let filename = path.as_ref().file_name().unwrap().to_str().unwrap();
 
+    let filename = path
+        .as_ref()
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let path_display = path.as_ref().display().to_string();
+
+    let value = metadata.clone();
+    let file_clone = filename.clone();
+    let player_bind = player.clone();
+
+    let play_thread = std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(really_play(player_bind, value, file_clone, volume));
+    });
+
+    if gui {
+        if let Some(pic) = metadata.picture() {
+            // Wayland環境でminifb使うとウィンドウ閉じるときにメッセージ出るの何
+            // XWayland強制するしかなくなっちゃったよ
+            unsafe { env::set_var("WAYLAND_DISPLAY", "") };
+            display_image::display(pic, path_display);
+        }
+    }
+
+    play_thread.join().unwrap();
+}
+
+async fn really_play(player: Player, metadata: MetaData, filename: String, volume: f32) {
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
     println!(
         "{}kHz/{}ch | {}",
@@ -23,7 +57,7 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
         player.channels(),
         format_duration(Duration::from_secs(metadata.duration().as_secs()))
     );
-    crate::display_info::display_info(filename, &metadata);
+    crate::display_info::display_info(&filename, &metadata);
 
     let music_play = Arc::new(Mutex::new(player.play().set_volume(volume)));
     let music_play_clone = Arc::clone(&music_play);
@@ -54,7 +88,7 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
     let mut tick_count = 0;
 
     loop {
-        // キー入力があったら終了
+        // ã‚­ãƒ¼å…¥åŠ›ãŒã‚ã£ãŸã‚‰çµ‚äº†
         if key_thread.is_finished() {
             pb.finish_and_clear();
             deinit();
@@ -62,7 +96,7 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
             return;
         }
 
-        // 再生が終了したかチェック
+        // å†ç”ŸãŒçµ‚äº†ã—ãŸã‹ãƒã‚§ãƒƒã‚¯
         if music_play.lock().unwrap().is_empty() {
             let mut key = key_state.lock().unwrap();
             *key = true;
@@ -77,16 +111,17 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
                 std::io::stdout(),
                 MoveToPreviousLine(2),
                 Clear(crossterm::terminal::ClearType::CurrentLine),
-            ).unwrap();
+            )
+            .unwrap();
             return;
         }
 
         sleep(Duration::from_millis(100)).await;
-        // 一時停止中はカウントしない
+        // ä¸€æ™‚åœæ­¢ä¸­ã¯ã‚«ã‚¦ãƒ³ãƒˆã—ãªã„
         if !music_play.lock().unwrap().is_paused() {
             tick_count += 1;
 
-            // 10tick (1秒) ごとに更新
+            // 10tick (1ç§’) ã”ã¨ã«æ›´æ–°
             if tick_count >= 10 {
                 tick_count = 0;
                 current_secs += 1;

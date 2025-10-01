@@ -1,3 +1,4 @@
+use crate::info::info;
 use crate::input::{deinit, get_input};
 use crate::player::player::Player;
 use humantime::format_duration;
@@ -18,14 +19,15 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
 
     let music_play = Arc::new(Mutex::new(player.play().set_volume(volume)));
     let music_play_clone = Arc::clone(&music_play);
-
-    let key_thread = tokio::spawn(get_input(music_play_clone));
+    let key_state = Arc::new(Mutex::new(false));
+    let key_state_clone = Arc::clone(&key_state);
+    let key_thread = tokio::spawn(get_input(music_play_clone, key_state_clone));
     let duration = metadata.duration().as_secs();
     let mut current_secs = 0;
     let pb = ProgressBar::new(duration);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("[{bar:40.cyan/blue}] ({msg})")
+            .template("[{bar:40.cyan/blue}] {msg}")
             .unwrap()
             .progress_chars("#>-"),
     );
@@ -49,6 +51,13 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32) {
 
         // 再生が終了したかチェック
         if music_play.lock().unwrap().is_empty() {
+            let mut key = key_state.lock().unwrap();
+            *key = true;
+            info(format!(
+                "{}/{} (finish)",
+                format_duration(Duration::from_secs(duration)),
+                format_duration(Duration::from_secs(current_secs))
+            ));
             pb.finish_and_clear();
             deinit();
             return;

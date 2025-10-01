@@ -1,3 +1,4 @@
+use crate::{err, info::info, player::play::MusicPlay};
 use crossterm::{
     cursor::{Hide, Show},
     event::{Event, KeyCode, poll, read},
@@ -11,8 +12,6 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-
-use crate::{err, info::info, player::play::MusicPlay};
 
 pub fn init_terminal() {
     enable_raw_mode().unwrap_or_else(|e| {
@@ -38,9 +37,13 @@ pub fn deinit() {
     });
 }
 
-pub async fn get_input(music_play: Arc<Mutex<MusicPlay>>) {
+pub async fn get_input(music_play: Arc<Mutex<MusicPlay>>, quit: Arc<Mutex<bool>>) {
     init_terminal();
     loop {
+        if *quit.lock().unwrap() {
+            return;
+        }
+
         if poll(Duration::from_millis(100)).unwrap() {
             let event = read().unwrap_or_else(|e| {
                 err!("Failed to read key: {}", e);

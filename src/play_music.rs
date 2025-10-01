@@ -88,7 +88,6 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
     let mut tick_count = 0;
 
     loop {
-        // ã‚­ãƒ¼å…¥åŠ›ãŒã‚ã£ãŸã‚‰çµ‚äº†
         if key_thread.is_finished() {
             pb.finish_and_clear();
             deinit();
@@ -96,7 +95,6 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
             return;
         }
 
-        // å†ç”ŸãŒçµ‚äº†ã—ãŸã‹ãƒã‚§ãƒƒã‚¯
         if music_play.lock().unwrap().is_empty() {
             let mut key = key_state.lock().unwrap();
             *key = true;
@@ -117,11 +115,9 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
         }
 
         sleep(Duration::from_millis(100)).await;
-        // ä¸€æ™‚åœæ­¢ä¸­ã¯ã‚«ã‚¦ãƒ³ãƒˆã—ãªã„
         if !music_play.lock().unwrap().is_paused() {
             tick_count += 1;
 
-            // 10tick (1ç§’) ã”ã¨ã«æ›´æ–°
             if tick_count >= 10 {
                 tick_count = 0;
                 current_secs += 1;

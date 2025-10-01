@@ -26,7 +26,9 @@ use clap::Parser;
 
 #[derive(Parser)]
 struct Cli {
+    /// Files to play (multiple selections allowed)
     files: Vec<String>,
+    /// Specify the default playback volume (minimum: 1, maximum: 100)
     #[arg(short, long)]
     volume: Option<u16>,
 }
@@ -44,6 +46,11 @@ async fn main() {
             exit(1);
         }
         volume = vol as f32 / 100.0;
+    }
+
+    if args.files.is_empty() {
+        err!("Music file is not specified!");
+        exit(1);
     }
 
     for path in args.files {

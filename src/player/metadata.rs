@@ -46,7 +46,6 @@ impl MetaData {
     }
 
     pub fn duration(&self) -> Duration {
-        
         self.prop.duration()
     }
 

@@ -40,9 +40,10 @@ pub fn info_with_restore<P: AsRef<str>>(msg: P, filename: String, metadata: Meta
 
         let last = LAST_CALL.lock().await;
         if let Some(last_time) = *last
-            && last_time != call_time {
-                return;
-            }
+            && last_time != call_time
+        {
+            return;
+        }
 
         execute!(
             std::io::stdout(),

@@ -5,11 +5,11 @@ use crate::player::metadata::MetaData;
 use crate::player::player_structs::Player;
 use crossterm::cursor::{self, MoveToPreviousLine};
 use crossterm::execute;
-use crossterm::terminal::Clear;
+use crossterm::terminal::{Clear, SetTitle};
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -33,6 +33,15 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let file_clone = filename.clone();
     let player_bind = player.clone();
 
+    execute!(
+        stdout(),
+        SetTitle(format!(
+            "{} - minau",
+            metadata.title().unwrap_or(path_display.clone())
+        ))
+    )
+    .unwrap();
+
     if !cfg!(target_os = "windows") {
         println!(
             "\x1b]2;{} - minau\x07",
@@ -45,19 +54,23 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         rt.block_on(really_play(player_bind, value, file_clone, volume));
     });
 
-    if gui
-        && let Some(pic) = metadata.picture() {
-            // Wayland環境でminifb使うとウィンドウ閉じるときにメッセージ出るの何
-            // XWayland強制するしかなくなっちゃったよ
-            unsafe { env::set_var("WAYLAND_DISPLAY", "") };
-            display_image::display(pic, path_display);
-        }
+    if gui && let Some(pic) = metadata.picture() {
+        // Wayland環境でminifb使うとウィンドウ閉じるときにメッセージ出るの何
+        // XWayland強制するしかなくなっちゃったよ
+        unsafe { env::set_var("WAYLAND_DISPLAY", "") };
+        display_image::display(pic, path_display);
+    }
 
     play_thread.join().unwrap();
-    if !cfg!(target_os = "windows") {
-        print!("\x1b]2;\x07");
-        stdout().flush().unwrap();
-    }
+
+    execute!(
+        stdout(),
+        SetTitle(format!("{}", env::current_dir().unwrap().display()))
+    )
+    .unwrap();
+
+    print!("\x1b]2;\x07");
+    stdout().flush().unwrap();
 }
 
 async fn really_play(player: Player, metadata: MetaData, filename: String, volume: f32) {
@@ -66,9 +79,10 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
             stdout(),
             cursor::MoveToPreviousLine(1),
             Clear(crossterm::terminal::ClearType::FromCursorDown)
-        ).unwrap();
+        )
+        .unwrap();
     }
-    
+
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
     println!(
         "{}kHz/{}ch | {}",

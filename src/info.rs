@@ -1,6 +1,6 @@
+use crate::err;
 use crossterm::{cursor, execute, terminal::Clear, terminal::ClearType};
 use std::process::exit;
-use crate::err;
 
 pub fn info<P: AsRef<str>>(msg: P) {
     let message = msg.as_ref();

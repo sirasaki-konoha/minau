@@ -1,13 +1,18 @@
-use std::{io::stdout, process::exit, time::Duration};
-
 use crossterm::{
     cursor::{Hide, Show},
     event::{Event, KeyCode, poll, read},
     execute,
+    style::Stylize,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use std::{
+    io::stdout,
+    process::exit,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use crate::{err, info::info};
+use crate::{err, info::info, player::play::MusicPlay};
 
 pub fn init_terminal() {
     enable_raw_mode().unwrap_or_else(|e| {
@@ -33,7 +38,7 @@ pub fn deinit() {
     });
 }
 
-pub async fn get_input() {
+pub async fn get_input(music_play: Arc<Mutex<MusicPlay>>) {
     init_terminal();
     loop {
         if poll(Duration::from_millis(100)).unwrap() {
@@ -49,6 +54,43 @@ pub async fn get_input() {
                         deinit();
                         println!();
                         exit(0);
+                    }
+                    KeyCode::Char('>') | KeyCode::Char('l') => {
+                        info("Next track");
+                        return;
+                    }
+                    KeyCode::Char(' ') => {
+                        let mut play = music_play.lock().unwrap();
+                        if play.is_paused() {
+                            play.resume();
+                            info("Resumed");
+                        } else {
+                            play.pause();
+                            info("Paused");
+                        }
+                    }
+                    KeyCode::Char('+') | KeyCode::Char('=') => {
+                        let mut play = music_play.lock().unwrap();
+                        let vol = play.get_volume();
+                        if vol == 1.0 {
+                            info(format!("{}", "Already at maximum volume!".red()));
+                        } else {
+                            play.set_volume_mut(vol + 0.1);
+                            let formated = (vol * 100.0).round() as u16;
+                            info(&format!("Volme set to {}", formated));
+                        }
+                    }
+
+                    KeyCode::Char('-') | KeyCode::Char('_') => {
+                        let mut play = music_play.lock().unwrap();
+                        let vol = play.get_volume();
+                        if vol < 0.0 {
+                            info(format!("{}", "Already at minimum volume!".red()));
+                        } else {
+                            play.set_volume_mut(vol - 0.1);
+                            let formated = (vol * 100.0).round() as u16;
+                            info(&format!("Volme set to {}", formated));
+                        }
                     }
                     KeyCode::Char(c) => {
                         info(format!("Unknown key: {}", c));

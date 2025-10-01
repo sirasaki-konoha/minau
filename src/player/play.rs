@@ -1,9 +1,16 @@
+use std::time::Duration;
+
 use crate::err;
 use crate::player::player::Player;
+use rodio::{OutputStream, Sink};
+
+pub struct MusicPlay {
+    sink: Sink,
+    _stream_handle: OutputStream,
+}
 
 impl Player {
-    /// this function is call sleep() until end
-    pub fn play(self) {
+    pub fn play(self) -> MusicPlay {
         let mut stream_handle =
             rodio::OutputStreamBuilder::open_default_stream().unwrap_or_else(|e| {
                 err!("Failed to open stream: {}", e);
@@ -14,7 +21,46 @@ impl Player {
         let sink = rodio::Sink::connect_new(stream_handle.mixer());
 
         sink.append(self.decoder);
+        // sleep_until_end()を削除！
 
-        sink.sleep_until_end();
+        MusicPlay {
+            sink,
+            _stream_handle: stream_handle, // ここで保持
+        }
+    }
+}
+
+impl MusicPlay {
+    pub fn is_empty(&self) -> bool {
+        self.sink.empty()
+    }
+
+    pub fn pause(&mut self) {
+        self.sink.pause();
+    }
+
+    pub fn resume(&mut self) {
+        self.sink.play();
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.sink.is_paused()
+    }
+
+    pub fn get_volume(&self) -> f32 {
+        self.sink.volume()
+    }
+
+    pub fn set_volume(self, vol: f32) -> Self {
+        self.sink.set_volume(vol);
+        self
+    }
+
+    pub fn set_volume_mut(&mut self, vol: f32) {
+        self.sink.set_volume(vol);
+    }
+
+    pub fn seek(self, secs: u64) -> Result<(), rodio::source::SeekError> {
+        self.sink.try_seek(Duration::from_secs(secs))
     }
 }

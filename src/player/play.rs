@@ -21,11 +21,10 @@ impl Player {
         let sink = rodio::Sink::connect_new(stream_handle.mixer());
 
         sink.append(self.decoder);
-        // sleep_until_end()を削除！
 
         MusicPlay {
             sink,
-            _stream_handle: stream_handle, // ここで保持
+            _stream_handle: stream_handle,
         }
     }
 }

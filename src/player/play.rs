@@ -59,6 +59,7 @@ impl MusicPlay {
         self.sink.set_volume(vol);
     }
 
+    #[allow(unused)]
     pub fn seek(self, secs: u64) -> Result<(), rodio::source::SeekError> {
         self.sink.try_seek(Duration::from_secs(secs))
     }

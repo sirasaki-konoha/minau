@@ -2,10 +2,8 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::properties::FileProperties;
 use lofty::tag::{Accessor, Tag};
-use std::f32::consts::E;
 use std::fs::File;
 use std::io::BufReader;
-use std::ops::Deref;
 use std::process::exit;
 use std::time::Duration;
 
@@ -16,6 +14,7 @@ pub struct MetaData {
     pub prop: FileProperties,
 }
 
+#[allow(unused)]
 impl MetaData {
     pub fn new(probe: Probe<BufReader<File>>) -> Self {
         let bind = probe.read().unwrap_or_else(|e| {
@@ -60,7 +59,7 @@ impl MetaData {
 
     pub fn track(&self) -> Option<u32> {
         if let Some(track) = &self.tag.track() {
-            Some(track.deref().clone())
+            Some(track.clone())
         } else {
             None
         }

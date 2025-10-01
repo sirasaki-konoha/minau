@@ -1,6 +1,5 @@
 use crate::err;
 use crate::player::player::Player;
-use std::{fs::File, path::Path};
 
 impl Player {
     /// this function is call sleep() until end

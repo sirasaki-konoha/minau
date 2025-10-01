@@ -2,7 +2,7 @@ use std::{io::stdout, process::exit, time::Duration};
 
 use crossterm::{
     cursor::{Hide, Show},
-    event::{Event, KeyCode, KeyEvent, KeyModifiers, poll, read},
+    event::{Event, KeyCode, poll, read},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode},
 };

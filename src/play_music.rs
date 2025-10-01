@@ -1,18 +1,7 @@
-use crate::info::info;
-use crate::input::{deinit, get_input, init_terminal};
-use crate::{
-    err,
-    player::{
-        info,
-        metadata::{self, MetaData},
-        player::Player,
-    },
-};
-use crossterm::event::poll;
-use crossterm::style::Stylize;
-use crossterm::{cursor, execute, terminal::Clear};
+use crate::input::{deinit, get_input};
+use crate::player::player::Player;
 use humantime::format_duration;
-use std::io::{self, Write};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 use std::{path::Path, process::exit};
 use tokio::time::sleep;
@@ -21,54 +10,34 @@ pub async fn play_music<P: AsRef<Path>>(path: P) {
     let player = Player::new(&path);
     let metadata = player.metadata();
     let filename = path.as_ref().file_name().unwrap().to_str().unwrap();
-    let path = path.as_ref().to_str().unwrap();
 
     println!(
-        "{}: {}K/{}ch",
-        path,
+        "{}K/{}ch",
         player.sample_rate(),
         player.channels()
     );
     crate::display_info::display_info(filename, &metadata);
-    println!();
-
+    println!("Welcome to minau!");
     let playing = tokio::spawn(async { player.play() });
-    let key_thread = tokio::spawn(get_input());
-    let duration = Duration::from_secs(metadata.duration().as_secs());
+    let _ = tokio::spawn(get_input());
+    let duration = metadata.duration().as_secs();
     let mut current_secs = 0;
+    let pb = ProgressBar::new(duration);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("[{bar:40.cyan/blue}] ({msg})").unwrap()
+        .progress_chars("#>-"));
 
+    pb.set_position(0);
+    pb.set_message(format!("{}/{}", format_duration(Duration::from_secs(duration)), format_duration(Duration::from_secs(current_secs))));
     loop {
         if playing.is_finished() {
-            println!();
+            pb.finish_and_clear();
             deinit();
             exit(0);
         }
-        display_status(duration, Duration::from_secs(current_secs));
         sleep(Duration::from_secs(1)).await;
         current_secs += 1;
+        pb.set_position(current_secs);
+        pb.set_message(format!("{}/{}", format_duration(Duration::from_secs(duration)), format_duration(Duration::from_secs(current_secs))));
     }
-}
-
-fn display_status(full: Duration, curr: Duration) {
-    let mut stdout = io::stdout();
-
-    execute!(
-        stdout,
-        cursor::MoveToPreviousLine(1),
-        cursor::MoveToColumn(0),
-        Clear(crossterm::terminal::ClearType::CurrentLine),
-    )
-    .unwrap_or_else(|e| {
-        err!("Failed to display status info: {}", e);
-        exit(1);
-    });
-
-    let total = format_duration(full);
-    let curr = format_duration(curr);
-    println!(
-        "{}: {}",
-        total.to_string().underline_red(),
-        curr.to_string().underline_green()
-    );
-    stdout.flush().unwrap();
 }

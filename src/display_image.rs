@@ -27,7 +27,7 @@ pub fn display(data: Vec<u8>, path: String) {
 
     let image_data = img.to_rgb8().into_raw();
     let mut buffer: Vec<u32> = image_data
-        .chunks_exact(3)  // RGB8なので3バイトずつ
+        .chunks_exact(3)
         .map(|px| (px[0] as u32) << 16 | (px[1] as u32) << 8 | (px[2] as u32))
         .collect();
 

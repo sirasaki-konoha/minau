@@ -1,19 +1,3 @@
-//! **minau**: A command-line music player built with Rust using the *rodio* library.
-//!
-//! **Quick usage:**
-//!
-//! ```
-//! minau <path/to/music/files> [--volume <volume>]
-//! ```
-//!
-//! **Details:**
-//! minau is a lightweight command-line music player that uses the Rust *rodio* library. It is highly efficient and works even in resource-constrained environments.
-//!
-//! **Command-line arguments:**
-//!
-//! * **files: `<Vec<String>>`** — Accepts music files to play (multiple files can be specified).
-//! * **volume** — Adjusts the playback volume. The maximum is 100 and the minimum is 1.
-
 mod display_image;
 mod display_info;
 mod info;
@@ -25,8 +9,10 @@ use std::process::exit;
 
 use clap::Parser;
 
-/// A simple, minimal music player
 #[derive(Parser)]
+#[command(name = env!("CARGO_PKG_NAME"))]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = env!("CARGO_PKG_DESCRIPTION"))]
 struct Cli {
     /// Files to play (multiple selections allowed)
     files: Vec<String>,

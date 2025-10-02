@@ -1,10 +1,11 @@
-use crate::display_image;
+use crate::{display_image, display_info};
 use crate::input::{deinit, get_input};
 use crate::player::metadata::MetaData;
 use crate::player::player_structs::Player;
 use crossterm::cursor::MoveToPreviousLine;
 use crossterm::{execute, terminal};
 use crossterm::terminal::{Clear, SetTitle};
+use crossterm::terminal::ClearType;
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
@@ -13,6 +14,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
+use unicode_width::UnicodeWidthStr;
 
 const TICK_INTERVAL_MS: u64 = 100;
 const TICKS_PER_SECOND: u32 = 10;
@@ -150,17 +152,18 @@ fn update_progress(pb: &ProgressBar, current: u64, total: u64) {
 }
 
 fn cleanup_and_exit(pb: &ProgressBar, metadata: MetaData, path: &str) {
-    let text_size = metadata.title().unwrap_or(path.to_string());
-    let (_cols, rows) = terminal::size().unwrap_or((0, u16::MAX));
+    let text_width = UnicodeWidthStr::width(display_info::string_info(path, &metadata).as_str());
+    let (cols, _rows) = terminal::size().unwrap_or((80, 24));
+    let lines_needed = ((text_width as u16 + cols - 1) / cols).max(1) - 1;
 
-    if text_size.chars().count() >= rows as usize {
+    for _ in 0..lines_needed {
         execute!(
             std::io::stdout(),
             MoveToPreviousLine(1),
-            Clear(crossterm::terminal::ClearType::FromCursorDown),
-        )
-        .unwrap();
+            Clear(ClearType::FromCursorDown),
+        ).unwrap();
     }
+
 
     pb.finish_and_clear();
     deinit();

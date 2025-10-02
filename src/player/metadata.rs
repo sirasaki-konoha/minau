@@ -17,13 +17,16 @@ pub struct MetaData {
 
 impl MetaData {
     pub fn new(probe: Probe<BufReader<File>>) -> Self {
-        let Ok(bind) = probe.read() else {
-            err!("Failed to read metadata");
-            exit(1);
+        let bind = match probe.read() {
+            Ok(bind) => bind,
+            Err(e) => {
+                err!("Failed to read metadata: {}", e);
+                exit(1);
+            }
         };
 
         let Some(s) = bind.primary_tag() else {
-            err!("Failed to get file tag");
+            // err!("Failed to get file tag");
             return Self {
                 tag: None,
                 prop: bind.properties().clone(),
@@ -66,8 +69,10 @@ impl MetaData {
 
     /// returns first of picture data
     pub fn picture(&self) -> Option<Vec<u8>> {
-        if let Some(s) = self.tag.clone().unwrap().pictures().first() {
-            return Some(s.data().to_vec());
+        if let Some(s) = self.tag.clone() {
+            if let Some(s) = s.pictures().first() {
+                return Some(s.data().to_vec());
+            }
         }
         None
     }

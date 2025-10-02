@@ -62,11 +62,14 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
 }
 
 async fn really_play(player: Player, metadata: MetaData, filename: String, volume: f32) {
-    execute!(
-        stdout(),
-        cursor::MoveToPreviousLine(1),
-        Clear(crossterm::terminal::ClearType::FromCursorDown)
-    ).unwrap();
+    if !cfg!(target_os = "windows") {
+        execute!(
+            stdout(),
+            cursor::MoveToPreviousLine(1),
+            Clear(crossterm::terminal::ClearType::FromCursorDown)
+        ).unwrap();
+    }
+    
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
     println!(
         "{}kHz/{}ch | {}",

@@ -57,7 +57,9 @@ pub fn display(data: Vec<u8>, path: String) {
             last_width = width;
             last_height = height;
         }
-        
-        window.update_with_buffer(&buffer, last_width, last_height).unwrap();
+
+        window
+            .update_with_buffer(&buffer, last_width, last_height)
+            .unwrap();
     }
 }

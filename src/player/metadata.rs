@@ -11,38 +11,53 @@ use crate::err;
 
 #[derive(Clone)]
 pub struct MetaData {
-    pub tag: Tag,
+    pub tag: Option<Tag>,
     pub prop: FileProperties,
 }
 
 impl MetaData {
     pub fn new(probe: Probe<BufReader<File>>) -> Self {
-        let bind = probe.read().unwrap_or_else(|e| {
-            err!("Failed to read metadata: {}", e);
-            exit(1);
-        });
-
-        let Some(s) = bind.primary_tag() else {
-            err!("Failed to get file tag");
+        let Ok(bind) = probe.read() else {
+            err!("Failed to read metadata");
             exit(1);
         };
 
+        let Some(s) = bind.primary_tag() else {
+            err!("Failed to get file tag");
+            return Self {
+                tag: None,
+                prop: bind.properties().clone(),
+            };
+        };
+
         Self {
-            tag: s.clone(),
+            tag: Some(s.clone()),
             prop: bind.properties().clone(),
         }
     }
 
     pub fn title(&self) -> Option<String> {
-        self.tag.title().as_ref().map(|title| title.to_string())
+        if let Some(tag) = &self.tag.clone() {
+            tag.title().as_ref().map(|title| title.to_string())
+        } else {
+            return None;
+        }
     }
 
     pub fn artist(&self) -> Option<String> {
-        self.tag.artist().as_ref().map(|artist| artist.to_string())
+        if let Some(tag) = &self.tag.clone() {
+            tag.title().as_ref().map(|artist| artist.to_string())
+        } else {
+            return None;
+        }
     }
 
     pub fn album(&self) -> Option<String> {
-        self.tag.album().as_ref().map(|album| album.to_string())
+        if let Some(tag) = &self.tag.clone() {
+            tag.title().as_ref().map(|album| album.to_string())
+        } else {
+            return None;
+        }
     }
 
     pub fn duration(&self) -> Duration {
@@ -51,7 +66,7 @@ impl MetaData {
 
     /// returns first of picture data
     pub fn picture(&self) -> Option<Vec<u8>> {
-        if let Some(s) = self.tag.pictures().first() {
+        if let Some(s) = self.tag.clone().unwrap().pictures().first() {
             return Some(s.data().to_vec());
         }
         None

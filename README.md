@@ -16,6 +16,7 @@ A lightweight, efficient command-line music player built with Rust using the *ro
 - 💻 **Cross-platform** - Works on Windows, macOS, and Linux
 - ⚡ **Low Resource Usage** - Efficient even in resource-constrained environments
 - 🎛️ **Easy to Use** - Intuitive command-line interface
+- ⌨️ **Keyboard Controls** - Pause/play, skip tracks, and adjust volume during playback
 
 ## Installation
 
@@ -93,6 +94,18 @@ Combine with volume control:
 minau music.mp3 --gui --volume 75
 ```
 
+### Keyboard Controls
+
+During playback, you can use the following keyboard shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `Space` | Toggle pause/play |
+| `q` | Quit the player |
+| `l` or `Shift + .` (>) | Skip to next track |
+| `-` or `_` | Decrease volume by 5 |
+| `+` or `=` | Increase volume by 5 |
+
 ### Examples
 
 ```bash
@@ -139,7 +152,6 @@ minau supports a wide range of audio formats through the rodio library:
 - WAV
 - FLAC
 - OGG Vorbis
-- And more...
 
 ## Requirements
 
@@ -163,7 +175,7 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 
 ## Author
@@ -172,4 +184,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Note:** For playback control (pause, stop, skip), simply use Ctrl+C to exit the player.
+**Note:** Use keyboard controls during playback for pause/play, volume adjustment, and track navigation.
+

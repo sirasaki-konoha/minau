@@ -1,7 +1,7 @@
 # minau
 
 <p align="center">
-  <img src="./icon/minau-icon.png" alt="minau icon" />
+  <img src="https://raw.githubusercontent.com/sirasaki-konoha/minau/refs/heads/master/icon/minau-icon.png" alt="minau icon" />
 </p>
 
 <p align="center">

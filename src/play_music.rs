@@ -15,6 +15,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::time::sleep;
 
+const TICK_INTERVAL_MS: u64 = 100;
+const TICKS_PER_SECOND: u32 = 10;
+
 pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let player = Player::new(&path);
     let metadata = player.metadata();
@@ -28,47 +31,41 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         .to_string();
 
     let path_display = path.as_ref().display().to_string();
+    let title = metadata.title().unwrap_or(path_display.clone());
+
+    set_terminal_title(&title);
 
     let value = metadata.clone();
     let file_clone = filename.clone();
     let player_bind = player.clone();
-
-    execute!(
-        stdout(),
-        SetTitle(format!(
-            "{} - minau",
-            metadata.title().unwrap_or(path_display.clone())
-        ))
-    )
-    .unwrap();
-
-    if !cfg!(target_os = "windows") {
-        println!(
-            "\x1b]2;{} - minau\x07",
-            metadata.title().unwrap_or(path_display.clone())
-        );
-    }
 
     let play_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(really_play(player_bind, value, file_clone, volume));
     });
 
-    if gui && let Some(pic) = metadata.picture() {
-        // Wayland環境でminifb使うとウィンドウ閉じるときにメッセージ出るの何
-        // XWayland強制するしかなくなっちゃったよ
-        unsafe { env::set_var("WAYLAND_DISPLAY", "") };
-        display_image::display(pic, path_display);
+    if gui {
+        if let Some(pic) = metadata.picture() {
+            unsafe { env::set_var("WAYLAND_DISPLAY", "") };
+            display_image::display(pic, path_display);
+        }
     }
 
     play_thread.join().unwrap();
 
-    execute!(
-        stdout(),
-        SetTitle(format!("{}", env::current_dir().unwrap().display()))
-    )
-    .unwrap();
+    reset_terminal_title();
+}
 
+fn set_terminal_title(title: &str) {
+    execute!(stdout(), SetTitle(format!("{} - minau", title))).unwrap();
+    if !cfg!(target_os = "windows") {
+        println!("\x1b]2;{} - minau\x07", title);
+    }
+}
+
+fn reset_terminal_title() {
+    let cwd = env::current_dir().unwrap().display().to_string();
+    execute!(stdout(), SetTitle(cwd)).unwrap();
     print!("\x1b]2;\x07");
     stdout().flush().unwrap();
 }
@@ -84,26 +81,59 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
     }
 
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
+    let duration = metadata.duration();
+    
     println!(
         "{}kHz/{}ch | {}",
         sample_rate_khz,
         player.channels(),
-        format_duration(Duration::from_secs(metadata.duration().as_secs()))
+        format_duration(Duration::from_secs(duration.as_secs()))
     );
     crate::display_info::display_info(&filename, &metadata);
 
     let music_play = Arc::new(Mutex::new(player.play().set_volume(volume)));
-    let music_play_clone = Arc::clone(&music_play);
     let key_state = Arc::new(Mutex::new(false));
-    let key_state_clone = Arc::clone(&key_state);
+    
     let key_thread = tokio::spawn(get_input(
-        music_play_clone,
-        key_state_clone,
-        filename.to_string(),
+        Arc::clone(&music_play),
+        Arc::clone(&key_state),
+        filename.clone(),
         metadata.clone(),
     ));
-    let duration = metadata.duration().as_secs();
-    let mut current_secs = 0;
+
+    let duration_secs = duration.as_secs();
+    let pb = create_progress_bar(duration_secs);
+
+    let mut current_secs = 0u64;
+    let mut tick_count = 0u32;
+
+    loop {
+        if key_thread.is_finished() {
+            cleanup_and_exit(&pb, None);
+            return;
+        }
+
+        if music_play.lock().unwrap().is_empty() {
+            *key_state.lock().unwrap() = true;
+            cleanup_and_exit(&pb, Some((current_secs, duration_secs)));
+            return;
+        }
+
+        sleep(Duration::from_millis(TICK_INTERVAL_MS)).await;
+        
+        if !music_play.lock().unwrap().is_paused() {
+            tick_count += 1;
+
+            if tick_count >= TICKS_PER_SECOND {
+                tick_count = 0;
+                current_secs += 1;
+                update_progress(&pb, current_secs, duration_secs);
+            }
+        }
+    }
+}
+
+fn create_progress_bar(duration: u64) -> ProgressBar {
     let pb = ProgressBar::new(duration);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -111,56 +141,39 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
             .unwrap()
             .progress_chars("=> "),
     );
-
     pb.set_position(0);
     pb.set_message(format!(
         "{} / {}",
-        format_duration(Duration::from_secs(current_secs)),
+        format_duration(Duration::from_secs(0)),
         format_duration(Duration::from_secs(duration))
     ));
-    let mut tick_count = 0;
-
-    loop {
-        if key_thread.is_finished() {
-            pb.finish_and_clear();
-            deinit();
-            drop(music_play);
-            return;
-        }
-
-        if music_play.lock().unwrap().is_empty() {
-            let mut key = key_state.lock().unwrap();
-            *key = true;
-            info(format!(
-                "{} / {}",
-                format_duration(Duration::from_secs(current_secs)),
-                format_duration(Duration::from_secs(duration))
-            ));
-            pb.finish_and_clear();
-            deinit();
-            execute!(
-                std::io::stdout(),
-                MoveToPreviousLine(2),
-                Clear(crossterm::terminal::ClearType::FromCursorDown),
-            )
-            .unwrap();
-            return;
-        }
-
-        sleep(Duration::from_millis(100)).await;
-        if !music_play.lock().unwrap().is_paused() {
-            tick_count += 1;
-
-            if tick_count >= 10 {
-                tick_count = 0;
-                current_secs += 1;
-                pb.set_position(current_secs);
-                pb.set_message(format!(
-                    "{} / {}",
-                    format_duration(Duration::from_secs(current_secs)),
-                    format_duration(Duration::from_secs(duration))
-                ));
-            }
-        }
-    }
+    pb
 }
+
+fn update_progress(pb: &ProgressBar, current: u64, total: u64) {
+    pb.set_position(current);
+    pb.set_message(format!(
+        "{} / {}",
+        format_duration(Duration::from_secs(current)),
+        format_duration(Duration::from_secs(total))
+    ));
+}
+
+fn cleanup_and_exit(pb: &ProgressBar, time_info: Option<(u64, u64)>) {
+    if let Some((current, total)) = time_info {
+        info(format!(
+            "{} / {}",
+            format_duration(Duration::from_secs(current)),
+            format_duration(Duration::from_secs(total))
+        ));
+    }
+    pb.finish_and_clear();
+    deinit();
+    execute!(
+        std::io::stdout(),
+        MoveToPreviousLine(2),
+        Clear(crossterm::terminal::ClearType::FromCursorDown),
+    )
+    .unwrap();
+}
+

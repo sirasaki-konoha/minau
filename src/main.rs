@@ -24,20 +24,27 @@ struct Cli {
     gui: bool,
 }
 
+const DEFAULT_VOLUME: u16 = 100;
+const MIN_VOLUME: u16 = 1;
+const MAX_VOLUME: u16 = 100;
+
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
 
-    let volume_percent: u16 = 100;
-    let mut volume: f32 = volume_percent as f32 / 100.0;
-
-    if let Some(vol) = args.volume {
-        if !(1..=100).contains(&vol) {
+    let volume = args.volume
+        .map(|vol| {
+            if (MIN_VOLUME..=MAX_VOLUME).contains(&vol) {
+                Ok(vol as f32 / 100.0)
+            } else {
+                Err(vol)
+            }
+        })
+        .unwrap_or(Ok(DEFAULT_VOLUME as f32 / 100.0))
+        .unwrap_or_else(|vol| {
             err!("{} is not available volume", vol);
             exit(1);
-        }
-        volume = vol as f32 / 100.0;
-    }
+        });
 
     if args.files.is_empty() {
         err!("Music file is not specified!");
@@ -48,3 +55,4 @@ async fn main() {
         play_music::play_music(path, volume, args.gui).await;
     }
 }
+

@@ -41,6 +41,9 @@ pub fn deinit() {
     });
 }
 
+const VOLUME_STEP: f32 = 0.05;
+const POLL_INTERVAL_MS: u64 = 100;
+
 pub async fn get_input(
     music_play: Arc<Mutex<MusicPlay>>,
     quit: Arc<Mutex<bool>>,
@@ -53,92 +56,88 @@ pub async fn get_input(
             return;
         }
 
-        if poll(Duration::from_millis(100)).unwrap() {
-            let event = read().unwrap_or_else(|e| {
-                err!("Failed to read key: {}", e);
-                exit(1);
-            });
+        if !poll(Duration::from_millis(POLL_INTERVAL_MS)).unwrap() {
+            continue;
+        }
 
-            if let Event::Key(key) = event {
-                match key.code {
-                    KeyCode::Char('q') => {
-                        info("Exitting...");
-                        deinit();
-                        println!();
-                        exit(0);
-                    }
-                    KeyCode::Char('>') | KeyCode::Char('l') => {
-                        info("Next track");
-                        execute!(
-                            std::io::stdout(),
-                            MoveToPreviousLine(2),
-                            Clear(crossterm::terminal::ClearType::FromCursorDown),
-                        )
-                        .unwrap();
-                        return;
-                    }
-                    KeyCode::Char(' ') => {
-                        let mut play = music_play.lock().unwrap();
-                        if play.is_paused() {
-                            play.resume();
-                            info_with_restore("Resumed", filename.clone(), metadata.clone());
-                        } else {
-                            play.pause();
-                            info_with_restore("Paused", filename.clone(), metadata.clone());
-                        }
-                    }
-                    KeyCode::Char('+') | KeyCode::Char('=') => {
-                        let mut play = music_play.lock().unwrap();
-                        let vol = play.get_volume();
-                        if vol >= 1.0 {
-                            info_with_restore(
-                                format!("{}", "Already at maximum volume!".red()),
-                                filename.clone(),
-                                metadata.clone(),
-                            );
-                            play.set_volume_mut(1.0);
-                        } else {
-                            let new_vol = vol + 0.05;
-                            play.set_volume_mut(new_vol);
-                            let formated = (new_vol * 100.0).round() as u16;
-                            info_with_restore(
-                                format!("Volume set to {}", formated.to_string().cyan()),
-                                filename.clone(),
-                                metadata.clone(),
-                            );
-                        }
-                    }
+        let event = read().unwrap_or_else(|e| {
+            err!("Failed to read key: {}", e);
+            exit(1);
+        });
 
-                    KeyCode::Char('-') | KeyCode::Char('_') => {
-                        let mut play = music_play.lock().unwrap();
-                        let vol = play.get_volume();
-                        if vol <= 0.0 {
-                            info_with_restore(
-                                format!("{}", "Already at minimum volume!".red()),
-                                filename.clone(),
-                                metadata.clone(),
-                            );
-                        } else {
-                            let new_vol = vol - 0.05;
-                            play.set_volume_mut(new_vol);
-                            let formated = (new_vol * 100.0).round() as u16;
-                            info_with_restore(
-                                format!("Volume set to {}", formated.to_string().cyan()),
-                                filename.clone(),
-                                metadata.clone(),
-                            );
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        info_with_restore(
-                            format!("Unknown key: {}", c.red()),
-                            filename.clone(),
-                            metadata.clone(),
-                        );
-                    }
-                    _ => {}
+        if let Event::Key(key) = event {
+            match key.code {
+                KeyCode::Char('q') => {
+                    info("Exitting...");
+                    deinit();
+                    println!();
+                    exit(0);
                 }
+                KeyCode::Char('>') | KeyCode::Char('l') => {
+                    info("Next track");
+                    execute!(
+                        std::io::stdout(),
+                        MoveToPreviousLine(2),
+                        Clear(crossterm::terminal::ClearType::FromCursorDown),
+                    )
+                    .unwrap();
+                    return;
+                }
+                KeyCode::Char(' ') => {
+                    let mut play = music_play.lock().unwrap();
+                    let msg = if play.is_paused() {
+                        play.resume();
+                        "Resumed"
+                    } else {
+                        play.pause();
+                        "Paused"
+                    };
+                    info_with_restore(msg, filename.clone(), metadata.clone());
+                }
+                KeyCode::Char('+') | KeyCode::Char('=') => {
+                    adjust_volume(&music_play, VOLUME_STEP, &filename, &metadata);
+                }
+                KeyCode::Char('-') | KeyCode::Char('_') => {
+                    adjust_volume(&music_play, -VOLUME_STEP, &filename, &metadata);
+                }
+                KeyCode::Char(c) => {
+                    info_with_restore(
+                        format!("Unknown key: {}", c.red()),
+                        filename.clone(),
+                        metadata.clone(),
+                    );
+                }
+                _ => {}
             }
         }
     }
 }
+
+fn adjust_volume(
+    music_play: &Arc<Mutex<MusicPlay>>,
+    delta: f32,
+    filename: &str,
+    metadata: &MetaData,
+) {
+    let mut play = music_play.lock().unwrap();
+    let vol = play.get_volume();
+    let new_vol = (vol + delta).clamp(0.0, 1.0);
+    
+    if new_vol == vol {
+        let msg = if delta > 0.0 {
+            "Already at maximum volume!".red().to_string()
+        } else {
+            "Already at minimum volume!".red().to_string()
+        };
+        info_with_restore(msg, filename.to_string(), metadata.clone());
+    } else {
+        play.set_volume_mut(new_vol);
+        let percent = (new_vol * 100.0).round() as u16;
+        info_with_restore(
+            format!("Volume set to {}", percent.to_string().cyan()),
+            filename.to_string(),
+            metadata.clone(),
+        );
+    }
+}
+

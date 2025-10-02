@@ -9,8 +9,8 @@ pub fn display(data: Vec<u8>, path: String) {
         exit(1);
     });
 
-    let (last_width, last_height) = img.dimensions();
-    let (mut last_width, mut last_height) = (last_width as usize, last_height as usize);
+    let (width, height) = img.dimensions();
+    let (mut last_width, mut last_height) = (width as usize, height as usize);
 
     let mut window = Window::new(
         &format!("{} - minau", path),
@@ -23,8 +23,10 @@ pub fn display(data: Vec<u8>, path: String) {
     )
     .unwrap();
 
-    let image_data = img.to_rgb8().into_raw();
-    let mut buffer: Vec<u32> = to_buffer(&image_data);
+    let mut buffer: Vec<u32> = img.to_rgb8()
+        .chunks_exact(3)
+        .map(|px| u32::from_be_bytes([0, px[0], px[1], px[2]]))
+        .collect();
 
     window
         .update_with_buffer(&buffer, last_width, last_height)
@@ -43,10 +45,9 @@ pub fn display(data: Vec<u8>, path: String) {
                 image::imageops::FilterType::Nearest,
             );
 
-            let image_data = resized.to_rgba8().into_raw();
-            buffer = image_data
+            buffer = resized.to_rgba8()
                 .chunks_exact(4)
-                .map(|px| (px[0] as u32) << 16 | (px[1] as u32) << 8 | (px[2] as u32))
+                .map(|px| u32::from_be_bytes([0, px[0], px[1], px[2]]))
                 .collect();
 
             last_width = width;
@@ -59,12 +60,4 @@ pub fn display(data: Vec<u8>, path: String) {
     }
 }
 
-pub fn to_buffer(vec: &[u8]) -> Vec<u32>{
-    let buffer: Vec<u32> = vec
-        .chunks_exact(3)
-        .map(|px| (px[0] as u32) << 16 | (px[1] as u32) << 8 | (px[2] as u32))
-        .collect();
-
-    buffer
-}
 

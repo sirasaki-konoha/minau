@@ -2,7 +2,6 @@
 macro_rules! err {
     ($($msg: expr), *) => {{
         use crossterm::style::Stylize;
-        let fmt = format!($($msg), *);
-        println!("{} {}", "Error:".red().bold(), fmt.red());
+        eprintln!("{} {}", "Error:".red().bold(), format!($($msg), *).red());
     }};
 }

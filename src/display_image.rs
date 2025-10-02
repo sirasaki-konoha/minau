@@ -1,8 +1,6 @@
 use std::process::exit;
-
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-
 use crate::err;
 
 pub fn display(data: Vec<u8>, path: String) {
@@ -16,8 +14,8 @@ pub fn display(data: Vec<u8>, path: String) {
 
     let mut window = Window::new(
         &format!("{} - minau", path),
-        last_width as usize,
-        last_height as usize,
+        last_width,
+        last_height,
         WindowOptions {
             resize: true,
             ..WindowOptions::default()
@@ -26,13 +24,10 @@ pub fn display(data: Vec<u8>, path: String) {
     .unwrap();
 
     let image_data = img.to_rgb8().into_raw();
-    let mut buffer: Vec<u32> = image_data
-        .chunks_exact(3)
-        .map(|px| (px[0] as u32) << 16 | (px[1] as u32) << 8 | (px[2] as u32))
-        .collect();
+    let mut buffer: Vec<u32> = to_buffer(&image_data);
 
     window
-        .update_with_buffer(&buffer, last_width as usize, last_height as usize)
+        .update_with_buffer(&buffer, last_width, last_height)
         .unwrap();
 
     while window.is_open()
@@ -63,3 +58,13 @@ pub fn display(data: Vec<u8>, path: String) {
             .unwrap();
     }
 }
+
+pub fn to_buffer(vec: &[u8]) -> Vec<u32>{
+    let buffer: Vec<u32> = vec
+        .chunks_exact(3)
+        .map(|px| (px[0] as u32) << 16 | (px[1] as u32) << 8 | (px[2] as u32))
+        .collect();
+
+    buffer
+}
+

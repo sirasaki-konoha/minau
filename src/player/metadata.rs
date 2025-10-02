@@ -43,7 +43,7 @@ impl MetaData {
         if let Some(tag) = &self.tag.clone() {
             tag.title().as_ref().map(|title| title.to_string())
         } else {
-            return None;
+            None
         }
     }
 
@@ -51,7 +51,7 @@ impl MetaData {
         if let Some(tag) = &self.tag.clone() {
             tag.title().as_ref().map(|artist| artist.to_string())
         } else {
-            return None;
+            None
         }
     }
 
@@ -59,7 +59,7 @@ impl MetaData {
         if let Some(tag) = &self.tag.clone() {
             tag.title().as_ref().map(|album| album.to_string())
         } else {
-            return None;
+            None
         }
     }
 
@@ -69,11 +69,10 @@ impl MetaData {
 
     /// returns first of picture data
     pub fn picture(&self) -> Option<Vec<u8>> {
-        if let Some(s) = self.tag.clone() {
-            if let Some(s) = s.pictures().first() {
+        if let Some(s) = self.tag.clone()
+            && let Some(s) = s.pictures().first() {
                 return Some(s.data().to_vec());
             }
-        }
         None
     }
 }

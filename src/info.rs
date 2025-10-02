@@ -1,5 +1,8 @@
 use crate::{err, player::metadata::MetaData};
-use crossterm::{cursor, execute, terminal::{Clear, ClearType}};
+use crossterm::{
+    cursor, execute,
+    terminal::{Clear, ClearType},
+};
 use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::Mutex;

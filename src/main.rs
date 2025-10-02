@@ -32,7 +32,8 @@ const MAX_VOLUME: u16 = 100;
 async fn main() {
     let args = Cli::parse();
 
-    let volume = args.volume
+    let volume = args
+        .volume
         .map(|vol| {
             if (MIN_VOLUME..=MAX_VOLUME).contains(&vol) {
                 Ok(vol as f32 / 100.0)
@@ -55,4 +56,3 @@ async fn main() {
         play_music::play_music(path, volume, args.gui).await;
     }
 }
-

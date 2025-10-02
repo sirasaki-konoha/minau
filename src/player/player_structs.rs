@@ -30,9 +30,6 @@ impl Player {
             exit(1);
         });
 
-        Player {
-            decoder,
-            path,
-        }
+        Player { decoder, path }
     }
 }

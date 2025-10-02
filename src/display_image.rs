@@ -1,7 +1,7 @@
-use std::process::exit;
+use crate::err;
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-use crate::err;
+use std::process::exit;
 
 pub fn display(data: Vec<u8>, path: String) {
     let img = image::load_from_memory(&data).unwrap_or_else(|e| {
@@ -23,7 +23,8 @@ pub fn display(data: Vec<u8>, path: String) {
     )
     .unwrap();
 
-    let mut buffer: Vec<u32> = img.to_rgb8()
+    let mut buffer: Vec<u32> = img
+        .to_rgb8()
         .chunks_exact(3)
         .map(|px| u32::from_be_bytes([0, px[0], px[1], px[2]]))
         .collect();
@@ -45,7 +46,8 @@ pub fn display(data: Vec<u8>, path: String) {
                 image::imageops::FilterType::Nearest,
             );
 
-            buffer = resized.to_rgba8()
+            buffer = resized
+                .to_rgba8()
                 .chunks_exact(4)
                 .map(|px| u32::from_be_bytes([0, px[0], px[1], px[2]]))
                 .collect();
@@ -59,5 +61,3 @@ pub fn display(data: Vec<u8>, path: String) {
             .unwrap();
     }
 }
-
-

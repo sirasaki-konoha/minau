@@ -122,7 +122,7 @@ fn adjust_volume(
     let mut play = music_play.lock().unwrap();
     let vol = play.get_volume();
     let new_vol = (vol + delta).clamp(0.0, 1.0);
-    
+
     if new_vol == vol {
         let msg = if delta > 0.0 {
             "Already at maximum volume!".red().to_string()
@@ -140,4 +140,3 @@ fn adjust_volume(
         );
     }
 }
-

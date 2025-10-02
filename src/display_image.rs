@@ -14,7 +14,7 @@ pub fn display(data: Vec<u8>, path: String) {
     let (width, height) = img.dimensions();
 
     let mut window = Window::new(
-        &path,
+        &format!("{} - minau", path),
         width as usize,
         height as usize,
         WindowOptions {

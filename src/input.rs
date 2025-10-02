@@ -72,7 +72,7 @@ pub async fn get_input(
                         execute!(
                             std::io::stdout(),
                             MoveToPreviousLine(2),
-                            Clear(crossterm::terminal::ClearType::CurrentLine),
+                            Clear(crossterm::terminal::ClearType::FromCursorDown),
                         )
                         .unwrap();
                         return;
@@ -98,7 +98,7 @@ pub async fn get_input(
                             );
                             play.set_volume_mut(1.0);
                         } else {
-                            let new_vol = vol + 0.1;
+                            let new_vol = vol + 0.05;
                             play.set_volume_mut(new_vol);
                             let formated = (new_vol * 100.0).round() as u16;
                             info_with_restore(
@@ -119,7 +119,7 @@ pub async fn get_input(
                                 metadata.clone(),
                             );
                         } else {
-                            let new_vol = vol - 0.1;
+                            let new_vol = vol - 0.05;
                             play.set_volume_mut(new_vol);
                             let formated = (new_vol * 100.0).round() as u16;
                             info_with_restore(

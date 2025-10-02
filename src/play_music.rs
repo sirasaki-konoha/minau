@@ -3,12 +3,13 @@ use crate::info::info;
 use crate::input::{deinit, get_input};
 use crate::player::metadata::MetaData;
 use crate::player::player::Player;
-use crossterm::cursor::MoveToPreviousLine;
+use crossterm::cursor::{self, MoveToPreviousLine};
 use crossterm::execute;
 use crossterm::terminal::Clear;
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
+use std::io::{stdout, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -32,6 +33,13 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let file_clone = filename.clone();
     let player_bind = player.clone();
 
+    if !cfg!(target_os = "windows") {
+        println!(
+            "\x1b]2;{} - minau\x07",
+            metadata.title().unwrap_or(path_display.clone())
+        );
+    }
+
     let play_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(really_play(player_bind, value, file_clone, volume));
@@ -47,9 +55,18 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     }
 
     play_thread.join().unwrap();
+    if !cfg!(target_os = "windows") {
+        print!("\x1b]2;\x07");
+        stdout().flush().unwrap();
+    }
 }
 
 async fn really_play(player: Player, metadata: MetaData, filename: String, volume: f32) {
+    execute!(
+        stdout(),
+        cursor::MoveToPreviousLine(1),
+        Clear(crossterm::terminal::ClearType::FromCursorDown)
+    ).unwrap();
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
     println!(
         "{}kHz/{}ch | {}",
@@ -108,7 +125,7 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
             execute!(
                 std::io::stdout(),
                 MoveToPreviousLine(2),
-                Clear(crossterm::terminal::ClearType::CurrentLine),
+                Clear(crossterm::terminal::ClearType::FromCursorDown),
             )
             .unwrap();
             return;

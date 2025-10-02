@@ -23,7 +23,7 @@ pub fn display_info(filename: &str, metadata: &MetaData) {
     }
 
     if let Some(title) = metadata.title() {
-        current.push_str(&format!("{}", title));
+        current.push_str(&title.to_string());
         infos.push(Infos::Title);
     }
 

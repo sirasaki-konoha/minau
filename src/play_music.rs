@@ -2,7 +2,7 @@ use crate::display_image;
 use crate::info::info;
 use crate::input::{deinit, get_input};
 use crate::player::metadata::MetaData;
-use crate::player::player::Player;
+use crate::player::player_structs::Player;
 use crossterm::cursor::{self, MoveToPreviousLine};
 use crossterm::execute;
 use crossterm::terminal::Clear;
@@ -45,14 +45,13 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         rt.block_on(really_play(player_bind, value, file_clone, volume));
     });
 
-    if gui {
-        if let Some(pic) = metadata.picture() {
+    if gui
+        && let Some(pic) = metadata.picture() {
             // Wayland環境でminifb使うとウィンドウ閉じるときにメッセージ出るの何
             // XWayland強制するしかなくなっちゃったよ
             unsafe { env::set_var("WAYLAND_DISPLAY", "") };
             display_image::display(pic, path_display);
         }
-    }
 
     play_thread.join().unwrap();
     if !cfg!(target_os = "windows") {

@@ -46,7 +46,7 @@ async fn main() {
     let mut volume: f32 = volume_percent as f32 / 100.0;
 
     if let Some(vol) = args.volume {
-        if vol > 100 || vol < 1 {
+        if !(1..=100).contains(&vol) {
             err!("{} is not available volume", vol);
             exit(1);
         }

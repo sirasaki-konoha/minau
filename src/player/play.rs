@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::err;
-use crate::player::player::Player;
+use crate::player::player_structs::Player;
 use rodio::{OutputStream, Sink};
 
 pub struct MusicPlay {

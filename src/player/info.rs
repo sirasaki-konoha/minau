@@ -2,7 +2,7 @@ use std::process::exit;
 
 use crate::err;
 use crate::player::metadata::MetaData;
-use crate::player::player::Player;
+use crate::player::player_structs::Player;
 use lofty::probe::Probe;
 use rodio::Source;
 

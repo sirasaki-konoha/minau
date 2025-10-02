@@ -39,11 +39,10 @@ pub fn info_with_restore<P: AsRef<str>>(msg: P, filename: String, metadata: Meta
         sleep(Duration::from_millis(2400)).await;
 
         let last = LAST_CALL.lock().await;
-        if let Some(last_time) = *last {
-            if last_time != call_time {
+        if let Some(last_time) = *last
+            && last_time != call_time {
                 return;
             }
-        }
 
         execute!(
             std::io::stdout(),

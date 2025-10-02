@@ -92,7 +92,7 @@ pub async fn get_input(
                         let vol = play.get_volume();
                         if vol >= 1.0 {
                             info_with_restore(
-                                &format!("{}", "Already at maximum volume!".red()),
+                                format!("{}", "Already at maximum volume!".red()),
                                 filename.clone(),
                                 metadata.clone(),
                             );
@@ -102,7 +102,7 @@ pub async fn get_input(
                             play.set_volume_mut(new_vol);
                             let formated = (new_vol * 100.0).round() as u16;
                             info_with_restore(
-                                &format!("Volume set to {}", formated.to_string().cyan()),
+                                format!("Volume set to {}", formated.to_string().cyan()),
                                 filename.clone(),
                                 metadata.clone(),
                             );
@@ -114,7 +114,7 @@ pub async fn get_input(
                         let vol = play.get_volume();
                         if vol <= 0.0 {
                             info_with_restore(
-                                &format!("{}", "Already at minimum volume!".red()),
+                                format!("{}", "Already at minimum volume!".red()),
                                 filename.clone(),
                                 metadata.clone(),
                             );
@@ -123,7 +123,7 @@ pub async fn get_input(
                             play.set_volume_mut(new_vol);
                             let formated = (new_vol * 100.0).round() as u16;
                             info_with_restore(
-                                &format!("Volume set to {}", formated.to_string().cyan()),
+                                format!("Volume set to {}", formated.to_string().cyan()),
                                 filename.clone(),
                                 metadata.clone(),
                             );
@@ -131,7 +131,7 @@ pub async fn get_input(
                     }
                     KeyCode::Char(c) => {
                         info_with_restore(
-                            &format!("Unknown key: {}", c.red()),
+                            format!("Unknown key: {}", c.red()),
                             filename.clone(),
                             metadata.clone(),
                         );

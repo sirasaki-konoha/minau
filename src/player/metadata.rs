@@ -15,7 +15,6 @@ pub struct MetaData {
     pub prop: FileProperties,
 }
 
-#[allow(unused)]
 impl MetaData {
     pub fn new(probe: Probe<BufReader<File>>) -> Self {
         let bind = probe.read().unwrap_or_else(|e| {
@@ -35,45 +34,25 @@ impl MetaData {
     }
 
     pub fn title(&self) -> Option<String> {
-        if let Some(title) = &self.tag.title() {
-            Some(title.to_string())
-        } else {
-            None
-        }
+        self.tag.title().as_ref().map(|title| title.to_string())
     }
 
     pub fn artist(&self) -> Option<String> {
-        if let Some(artist) = &self.tag.artist() {
-            Some(artist.to_string())
-        } else {
-            None
-        }
+        self.tag.artist().as_ref().map(|artist| artist.to_string())
     }
 
     pub fn album(&self) -> Option<String> {
-        if let Some(album) = &self.tag.album() {
-            Some(album.to_string())
-        } else {
-            None
-        }
-    }
-
-    pub fn track(&self) -> Option<u32> {
-        if let Some(track) = &self.tag.track() {
-            Some(track.clone())
-        } else {
-            None
-        }
+        self.tag.album().as_ref().map(|album| album.to_string())
     }
 
     pub fn duration(&self) -> Duration {
-        let duration = self.prop.duration();
-        duration
+        
+        self.prop.duration()
     }
 
     /// returns first of picture data
     pub fn picture(&self) -> Option<Vec<u8>> {
-        if let Some(s) = self.tag.pictures().get(0) {
+        if let Some(s) = self.tag.pictures().first() {
             return Some(s.data().to_vec());
         }
         None

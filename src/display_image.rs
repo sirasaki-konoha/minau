@@ -1,9 +1,9 @@
 use crate::{display_info::string_info, err, player::metadata::MetaData};
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-use std::{process::exit, thread, time::Duration};
+use std::{process::exit, sync::{Arc, Mutex}, thread, time::Duration};
 
-pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData) {
+pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData, close: Arc<Mutex<bool>>) {
     let img = image::load_from_memory(&data).unwrap_or_else(|e| {
         err!("Unsupported image type\n{}", e);
         exit(1);
@@ -42,6 +42,10 @@ pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData) {
         && !window.is_key_down(minifb::Key::Q)
     {
         thread::sleep(Duration::from_millis(200));
+        if *close.lock().unwrap() {
+            break;
+        }
+
         let (width, height) = window.get_size();
 
         if width != last_width || height != last_height {

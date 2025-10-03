@@ -48,8 +48,10 @@ pub async fn get_input(
     music_play: Arc<Mutex<MusicPlay>>,
     quit: Arc<Mutex<bool>>,
     filename: String,
+    path: String,
     metadata: MetaData,
 ) {
+    let path = path.as_str();
     init_terminal();
     loop {
         if *quit.lock().unwrap() {
@@ -92,18 +94,19 @@ pub async fn get_input(
                         play.pause();
                         "Paused"
                     };
-                    info_with_restore(msg, filename.clone(), metadata.clone());
+                    info_with_restore(msg, filename.clone(), path.to_string(), metadata.clone());
                 }
                 KeyCode::Char('+') | KeyCode::Char('=') => {
-                    adjust_volume(&music_play, VOLUME_STEP, &filename, &metadata);
+                    adjust_volume(&music_play, VOLUME_STEP, &filename, path, &metadata);
                 }
                 KeyCode::Char('-') | KeyCode::Char('_') => {
-                    adjust_volume(&music_play, -VOLUME_STEP, &filename, &metadata);
+                    adjust_volume(&music_play, -VOLUME_STEP, &filename, path, &metadata);
                 }
                 KeyCode::Char(c) => {
                     info_with_restore(
                         format!("Unknown key: {}", c.red()),
                         filename.clone(),
+                        path.to_string(),
                         metadata.clone(),
                     );
                 }
@@ -117,6 +120,7 @@ fn adjust_volume(
     music_play: &Arc<Mutex<MusicPlay>>,
     delta: f32,
     filename: &str,
+    path: &str,
     metadata: &MetaData,
 ) {
     let mut play = music_play.lock().unwrap();
@@ -129,13 +133,19 @@ fn adjust_volume(
         } else {
             "Already at minimum volume!".red().to_string()
         };
-        info_with_restore(msg, filename.to_string(), metadata.clone());
+        info_with_restore(
+            msg,
+            filename.to_string(),
+            path.to_string(),
+            metadata.clone(),
+        );
     } else {
         play.set_volume_mut(new_vol);
         let percent = (new_vol * 100.0).round() as u16;
         info_with_restore(
             format!("Volume set to {}", percent.to_string().cyan()),
             filename.to_string(),
+            path.to_string(),
             metadata.clone(),
         );
     }

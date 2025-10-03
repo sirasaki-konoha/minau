@@ -1,4 +1,3 @@
-
 use crate::player::metadata::MetaData;
 
 pub fn display_info(filename: &str, metadata: &MetaData) {
@@ -18,8 +17,7 @@ pub fn display_info(filename: &str, metadata: &MetaData) {
     }
 }
 
-
-pub fn string_info(filename: &str, metadata: &MetaData) -> String{
+pub fn string_info(filename: &str, metadata: &MetaData) -> String {
     let parts: Vec<String> = vec![
         metadata.album().map(|a| format!("[{}] ", a)),
         metadata.artist().map(|a| format!("{} - ", a)),
@@ -34,6 +32,4 @@ pub fn string_info(filename: &str, metadata: &MetaData) -> String{
     } else {
         format!("{}", parts.concat())
     }
-
 }
-

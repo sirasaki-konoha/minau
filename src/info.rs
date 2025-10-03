@@ -1,12 +1,15 @@
-use crate::{err, player::metadata::MetaData};
+use crate::display_info;
+use crate::player::metadata::MetaData;
+use crossterm::terminal;
 use crossterm::{
-    cursor, execute,
+    cursor::{self, MoveToPreviousLine},
+    execute,
     terminal::{Clear, ClearType},
 };
-use std::process::exit;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant, sleep};
+use unicode_width::UnicodeWidthStr;
 
 static LAST_CALL: once_cell::sync::Lazy<Arc<Mutex<Option<Instant>>>> =
     once_cell::sync::Lazy::new(|| Arc::new(Mutex::new(None)));
@@ -17,18 +20,19 @@ pub fn info<P: AsRef<str>>(msg: P) {
     execute!(
         stdout,
         cursor::MoveToPreviousLine(1),
-        cursor::MoveToColumn(0),
-        Clear(ClearType::CurrentLine)
+        Clear(ClearType::FromCursorDown),
     )
-    .unwrap_or_else(|e| {
-        err!("Failed to display info: {}", e);
-        exit(1);
-    });
+    .unwrap();
 
     println!("{}", msg.as_ref());
 }
 
-pub fn info_with_restore<P: AsRef<str>>(msg: P, filename: String, metadata: MetaData) {
+pub fn info_with_restore<P: AsRef<str>>(
+    msg: P,
+    filename: String,
+    path: String,
+    metadata: MetaData,
+) {
     info(msg);
 
     tokio::spawn(async move {
@@ -44,16 +48,30 @@ pub fn info_with_restore<P: AsRef<str>>(msg: P, filename: String, metadata: Meta
             return;
         }
 
-        execute!(
-            std::io::stdout(),
-            cursor::MoveToPreviousLine(1),
-            cursor::MoveToColumn(0),
-            Clear(ClearType::CurrentLine)
-        )
-        .unwrap_or_else(|e| {
-            err!("Failed to display info: {}", e);
-            exit(1);
-        });
+        let text_width =
+            UnicodeWidthStr::width(display_info::string_info(&path, &metadata).as_str());
+        let (cols, _rows) = terminal::size().unwrap_or((80, 24));
+        let lines_needed = ((text_width as u16 + cols - 1) / cols).max(1); // 
+
+        for _ in 0..lines_needed {
+            execute!(
+                std::io::stdout(),
+                MoveToPreviousLine(1),
+                Clear(ClearType::FromCursorDown),
+            )
+            .unwrap();
+        }
+
+        // execute!(
+        //     std::io::stdout(),
+        //     cursor::MoveToPreviousLine(1),
+        //     cursor::MoveToColumn(0),
+        //     Clear(ClearType::CurrentLine)
+        // )
+        // .unwrap_or_else(|e| {
+        //     err!("Failed to display info: {}", e);
+        //     exit(1);
+        // });
         crate::display_info::display_info(&filename, &metadata);
     });
 }

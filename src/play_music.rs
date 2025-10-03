@@ -1,11 +1,11 @@
-use crate::{display_image, display_info};
 use crate::input::{deinit, get_input};
 use crate::player::metadata::MetaData;
 use crate::player::player_structs::Player;
+use crate::{display_image, display_info};
 use crossterm::cursor::MoveToPreviousLine;
-use crossterm::{execute, terminal};
-use crossterm::terminal::{Clear, SetTitle};
 use crossterm::terminal::ClearType;
+use crossterm::terminal::{Clear, SetTitle};
+use crossterm::{execute, terminal};
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
@@ -40,16 +40,16 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let file_clone = filename.clone();
     let player_bind = player.clone();
 
+    let bind = path_display.clone();
     let play_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(really_play(player_bind, value, file_clone, volume));
+        rt.block_on(really_play(player_bind, value, file_clone, bind, volume));
     });
 
-    if gui
-        && let Some(pic) = metadata.picture() {
-            unsafe { env::set_var("WAYLAND_DISPLAY", "") };
-            display_image::display(pic, path_display);
-        }
+    if gui && let Some(pic) = metadata.picture() {
+        unsafe { env::set_var("WAYLAND_DISPLAY", "") };
+        display_image::display(pic, path_display);
+    }
 
     play_thread.join().unwrap();
 
@@ -58,10 +58,6 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
 
 fn set_terminal_title(title: &str) {
     execute!(stdout(), SetTitle(format!("{} - minau", title))).unwrap();
-    if !cfg!(target_os = "windows") {
-        print!("\x1b]2;{} - minau\x07", title);
-        stdout().flush().unwrap();
-    }
 }
 
 fn reset_terminal_title() {
@@ -71,7 +67,13 @@ fn reset_terminal_title() {
     stdout().flush().unwrap();
 }
 
-async fn really_play(player: Player, metadata: MetaData, filename: String, volume: f32) {
+async fn really_play(
+    player: Player,
+    metadata: MetaData,
+    filename: String,
+    path: String,
+    volume: f32,
+) {
     let sample_rate_khz = player.sample_rate() as f32 / 1000.0;
     let duration = metadata.duration();
 
@@ -90,6 +92,7 @@ async fn really_play(player: Player, metadata: MetaData, filename: String, volum
         Arc::clone(&music_play),
         Arc::clone(&key_state),
         filename.clone(),
+        path,
         metadata.clone(),
     ));
 
@@ -161,9 +164,9 @@ fn cleanup_and_exit(pb: &ProgressBar, metadata: MetaData, path: &str) {
             std::io::stdout(),
             MoveToPreviousLine(1),
             Clear(ClearType::FromCursorDown),
-        ).unwrap();
+        )
+        .unwrap();
     }
-
 
     pb.finish_and_clear();
     deinit();

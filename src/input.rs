@@ -128,7 +128,6 @@ pub async fn get_input(
                 KeyCode::Char('h') => {
                     let play = music_play.lock().unwrap();
                     let cur_pos = play.get_pos();
-                    // saturating_sub を使ってオーバーフローを防ぐ
                     let new_pos = cur_pos.saturating_sub(Duration::from_secs(SEEK_STEP_SECS));
                     match play.seek(new_pos) {
                         Ok(_) => {

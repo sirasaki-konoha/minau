@@ -1,4 +1,4 @@
-use crate::{err, info::info};
+use crate::err;
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
 use std::{process::exit, thread, time::Duration};
@@ -38,17 +38,17 @@ pub fn display(data: Vec<u8>, path: String) {
         && !window.is_key_down(minifb::Key::Q)
     {
         
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(200));
         let (width, height) = window.get_size();
 
         if width != last_width || height != last_height {
-            let resized = img.resize_exact(
+            let img = img.resize_exact(
                 width as u32,
                 height as u32,
                 image::imageops::FilterType::Nearest,
             );
 
-            buffer = resized
+            buffer = img
                 .to_rgba8()
                 .chunks_exact(4)
                 .map(|px| u32::from_be_bytes([0, px[0], px[1], px[2]]))
@@ -56,7 +56,6 @@ pub fn display(data: Vec<u8>, path: String) {
 
             last_width = width;
             last_height = height;
-            info(format!("Resized image: {}x{}", width, height));
             window
                 .update_with_buffer(&buffer, last_width, last_height)
                 .unwrap();

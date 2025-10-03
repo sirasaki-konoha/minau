@@ -45,7 +45,8 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let bind_clg = Arc::clone(&close_gui);
     let play_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on( async { really_play(player_bind, value, file_clone, bind, volume).await;
+        rt.block_on(async {
+            really_play(player_bind, value, file_clone, bind, volume).await;
             let mut clg = bind_clg.lock().unwrap();
             *clg = true;
         });

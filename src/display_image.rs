@@ -1,7 +1,12 @@
 use crate::{display_info::string_info, err, player::metadata::MetaData};
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-use std::{process::exit, sync::{Arc, Mutex}, thread, time::Duration};
+use std::{
+    process::exit,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 
 pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData, close: Arc<Mutex<bool>>) {
     let img = image::load_from_memory(&data).unwrap_or_else(|e| {

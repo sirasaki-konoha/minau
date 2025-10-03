@@ -1,5 +1,5 @@
-use std::{fs, path::Path, process::exit};
 use crate::{err, play_music};
+use std::{fs, path::Path, process::exit};
 
 fn parse(m3u: &str) -> Vec<String> {
     m3u.lines()
@@ -15,14 +15,14 @@ pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         err!("Failed to read m3u file: {}", e);
         exit(1);
     });
-    
+
     for file in parse(&content) {
         // TODO: Support url case
         if file.starts_with("http://") || file.starts_with("https://") {
             err!("{}: minau is not supporting url", &file);
             continue;
         }
-        
+
         let file_path = if Path::new(&file).is_absolute() {
             file
         } else {
@@ -32,8 +32,7 @@ pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
                 .to_string_lossy()
                 .to_string()
         };
-        
+
         play_music::play_music(file_path, volume, gui).await;
     }
 }
-

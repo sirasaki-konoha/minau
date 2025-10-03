@@ -20,7 +20,7 @@ pub fn info<P: AsRef<str>>(msg: P) {
     execute!(
         stdout,
         cursor::MoveToPreviousLine(1),
-        Clear(ClearType::FromCursorDown),
+        Clear(ClearType::CurrentLine),
     )
     .unwrap();
 
@@ -51,13 +51,13 @@ pub fn info_with_restore<P: AsRef<str>>(
         let text_width =
             UnicodeWidthStr::width(display_info::string_info(&path, &metadata).as_str());
         let (cols, _rows) = terminal::size().unwrap_or((80, 24));
-        let lines_needed = (text_width as u16).div_ceil(cols).max(1); // 
+        let lines_needed = (text_width as u16).div_ceil(cols).max(1);
 
         for _ in 0..lines_needed {
             execute!(
                 std::io::stdout(),
                 MoveToPreviousLine(1),
-                Clear(ClearType::FromCursorDown),
+                Clear(ClearType::CurrentLine),
             )
             .unwrap();
         }

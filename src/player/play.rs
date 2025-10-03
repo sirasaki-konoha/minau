@@ -60,7 +60,11 @@ impl MusicPlay {
     }
 
     #[allow(unused)]
-    pub fn seek(self, secs: u64) -> Result<(), rodio::source::SeekError> {
-        self.sink.try_seek(Duration::from_secs(secs))
+    pub fn seek(&self, dur: Duration) -> Result<(), rodio::source::SeekError> {
+        self.sink.try_seek(dur)
+    }
+
+    pub fn get_pos(&self) -> std::time::Duration {
+        self.sink.get_pos()
     }
 }

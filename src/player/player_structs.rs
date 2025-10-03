@@ -1,4 +1,5 @@
 use rodio::Decoder;
+use rodio::decoder::DecoderBuilder;
 use std::io::BufReader;
 use std::path::Path;
 use std::{fs::File, process::exit};
@@ -25,10 +26,29 @@ impl Player {
             exit(1);
         });
 
-        let decoder = Decoder::new(BufReader::new(file.try_clone().unwrap())).unwrap_or_else(|e| {
-            err!("Failed to decode {}: {}", path, e);
-            exit(1);
-        });
+        let buff = BufReader::new(file.try_clone().unwrap());
+        let len = file
+            .metadata()
+            .unwrap_or_else(|e| {
+                err!("Failed to get metadata from {}: {}", &path, e);
+                exit(1);
+            })
+            .len();
+
+        let decoder = DecoderBuilder::new()
+            .with_seekable(true)
+            .with_data(buff)
+            .with_byte_len(len)
+            .build()
+            .unwrap_or_else(|e| {
+                err!("Failed to build decoder: {}", e);
+                exit(1);
+            });
+
+        // let decoder = Decoder::new(BufReader::new(file)).unwrap_or_else(|e| {
+        //     err!("Failed to decode {}: {}", path, e);
+        //     exit(1);
+        // });
 
         Player { decoder, path }
     }

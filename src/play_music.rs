@@ -1,3 +1,4 @@
+use crate::display_info::string_info;
 use crate::input::{deinit, get_input};
 use crate::player::metadata::MetaData;
 use crate::player::player_structs::Player;
@@ -17,7 +18,7 @@ use tokio::time::sleep;
 use unicode_width::UnicodeWidthStr;
 
 const TICK_INTERVAL_MS: u64 = 100;
-const TICKS_PER_SECOND: u32 = 10;
+const TICKS_PER_SECOND: u32 = 4;
 
 pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     let player = Player::new(&path);
@@ -32,9 +33,8 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         .to_string();
 
     let path_display = path.as_ref().display().to_string();
-    let title = metadata.title().unwrap_or(path_display.clone());
 
-    set_terminal_title(&title);
+    set_terminal_title(&filename, &metadata);
 
     let value = metadata.clone();
     let file_clone = filename.clone();
@@ -48,10 +48,10 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
 
     if gui && let Some(pic) = metadata.picture() {
         if cfg!(target_os = "linux") && env::var("WAYLAND_DISPLAY").is_ok() {
-            unsafe { env ::remove_var("WAYLAND_DISPLAY") };
+            unsafe { env::remove_var("WAYLAND_DISPLAY") };
         }
 
-        display_image::display(pic, path_display);
+        display_image::display(pic, &filename, metadata);
     }
 
     play_thread.join().unwrap();
@@ -59,8 +59,8 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     reset_terminal_title();
 }
 
-fn set_terminal_title(title: &str) {
-    execute!(stdout(), SetTitle(format!("{} - minau", title))).unwrap();
+fn set_terminal_title(filename: &str, metadata: &MetaData) {
+    execute!(stdout(), SetTitle(string_info(filename, metadata))).unwrap();
 }
 
 fn reset_terminal_title() {
@@ -102,7 +102,6 @@ async fn really_play(
     let duration_secs = duration.as_secs();
     let pb = create_progress_bar(duration_secs);
 
-    let mut current_secs = 0u64;
     let mut tick_count = 0u32;
 
     loop {
@@ -124,7 +123,7 @@ async fn really_play(
 
             if tick_count >= TICKS_PER_SECOND {
                 tick_count = 0;
-                current_secs += 1;
+                let current_secs = music_play.lock().unwrap().get_pos().as_secs();
                 update_progress(&pb, current_secs, duration_secs);
             }
         }
@@ -135,9 +134,9 @@ fn create_progress_bar(duration: u64) -> ProgressBar {
     let pb = ProgressBar::new(duration);
     pb.set_style(
         ProgressStyle::default_bar()
-            .template("{bar:40.cyan/blue} {msg}")
+            .template("{bar:40.yellow} {msg}")
             .unwrap()
-            .progress_chars("=> "),
+            .progress_chars("# "),
     );
     pb.set_position(0);
     pb.set_message(format!(
@@ -161,6 +160,13 @@ fn cleanup_and_exit(pb: &ProgressBar, metadata: MetaData, path: &str) {
     let text_width = UnicodeWidthStr::width(display_info::string_info(path, &metadata).as_str());
     let (cols, _rows) = terminal::size().unwrap_or((80, 24));
     let lines_needed = (text_width as u16).div_ceil(cols).max(1) - 1;
+
+    execute!(
+        std::io::stdout(),
+        MoveToPreviousLine(2),
+        Clear(crossterm::terminal::ClearType::FromCursorDown),
+    )
+    .unwrap();
 
     for _ in 0..lines_needed {
         execute!(

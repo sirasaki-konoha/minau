@@ -109,7 +109,7 @@ During playback, you can use the following keyboard shortcuts:
 |-----|--------|
 | `Space` | Toggle pause/play |
 | `q` | Quit the player |
-| `l` or `Shift + .` (>) | Skip to next track |
+| `Right Key` or `Shift + .` (>) | Skip to next track |
 | `-` or `_` | Decrease volume by 5 |
 | `+` or `=` | Increase volume by 5 |
 

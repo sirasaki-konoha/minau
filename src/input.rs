@@ -4,11 +4,11 @@ use crate::{
     player::{metadata::MetaData, play::MusicPlay},
 };
 use crossterm::{
-    cursor::{Hide, MoveToPreviousLine, Show},
+    cursor::{Hide, Show},
     event::{Event, KeyCode, poll, read},
     execute,
     style::Stylize,
-    terminal::{Clear, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
 use std::{
     io::stdout,
@@ -43,6 +43,7 @@ pub fn deinit() {
 
 const VOLUME_STEP: f32 = 0.05;
 const POLL_INTERVAL_MS: u64 = 100;
+const SEEK_STEP_SECS: u64 = 5;
 
 pub async fn get_input(
     music_play: Arc<Mutex<MusicPlay>>,
@@ -75,32 +76,89 @@ pub async fn get_input(
                     println!();
                     exit(0);
                 }
-                KeyCode::Char('>') | KeyCode::Char('l') => {
+                KeyCode::Char('>') | KeyCode::Right => {
                     info("Next track");
-                    execute!(
-                        std::io::stdout(),
-                        MoveToPreviousLine(2),
-                        Clear(crossterm::terminal::ClearType::FromCursorDown),
-                    )
-                    .unwrap();
                     return;
                 }
                 KeyCode::Char(' ') => {
                     let mut play = music_play.lock().unwrap();
                     let msg = if play.is_paused() {
                         play.resume();
-                        "Resumed"
+                        "|> Resumed"
                     } else {
                         play.pause();
-                        "Paused"
+                        "|| Paused"
                     };
                     info_with_restore(msg, filename.clone(), path.to_string(), metadata.clone());
                 }
-                KeyCode::Char('+') | KeyCode::Char('=') => {
+                KeyCode::Char('+') | KeyCode::Char('=') | KeyCode::Char('k') => {
                     adjust_volume(&music_play, VOLUME_STEP, &filename, path, &metadata);
                 }
-                KeyCode::Char('-') | KeyCode::Char('_') => {
+                KeyCode::Char('-') | KeyCode::Char('_') | KeyCode::Char('j') => {
                     adjust_volume(&music_play, -VOLUME_STEP, &filename, path, &metadata);
+                }
+                KeyCode::Char('l') => {
+                    let play = music_play.lock().unwrap();
+                    let cur_pos = play.get_pos();
+                    let new_pos = cur_pos + Duration::from_secs(SEEK_STEP_SECS);
+                    if let Err(_) = play.seek(new_pos) {
+                        info_with_restore(
+                            "Seek not supported for this audio format".red().to_string(),
+                            filename.clone(),
+                            path.to_string(),
+                            metadata.clone(),
+                        );
+                    }
+                    info(format!(
+                        "Seeked forward ({} -> {})",
+                        humantime::format_duration(cur_pos),
+                        humantime::format_duration(new_pos)
+                    ));
+                    info_with_restore(
+                        format!(
+                            "Seeked forward ({} -> {})",
+                            humantime::format_duration(cur_pos),
+                            humantime::format_duration(new_pos)
+                        ),
+                        filename.clone(),
+                        path.to_string(),
+                        metadata.clone(),
+                    );
+                }
+                KeyCode::Char('h') => {
+                    let play = music_play.lock().unwrap();
+                    let cur_pos = play.get_pos();
+                    // saturating_sub を使ってオーバーフローを防ぐ
+                    let new_pos = cur_pos.saturating_sub(Duration::from_secs(SEEK_STEP_SECS));
+                    match play.seek(new_pos) {
+                        Ok(_) => {
+                            info_with_restore(
+                                format!(
+                                    "Seeked backward ({} -> {})",
+                                    humantime::format_duration(cur_pos),
+                                    humantime::format_duration(new_pos)
+                                ),
+                                filename.clone(),
+                                path.to_string(),
+                                metadata.clone(),
+                            );
+                        }
+                        Err(e) => {
+                            info_with_restore(
+                                format!(
+                                    "Seek failed: {:?} (pos: {}s -> {}s)",
+                                    e,
+                                    cur_pos.as_secs(),
+                                    new_pos.as_secs()
+                                )
+                                .red()
+                                .to_string(),
+                                filename.clone(),
+                                path.to_string(),
+                                metadata.clone(),
+                            );
+                        }
+                    }
                 }
                 KeyCode::Char(c) => {
                     info_with_restore(

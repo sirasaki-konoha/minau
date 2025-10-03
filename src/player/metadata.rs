@@ -26,7 +26,6 @@ impl MetaData {
         };
 
         let Some(s) = bind.primary_tag() else {
-            // err!("Failed to get file tag");
             return Self {
                 tag: None,
                 prop: bind.properties().clone(),
@@ -49,7 +48,7 @@ impl MetaData {
 
     pub fn artist(&self) -> Option<String> {
         if let Some(tag) = &self.tag.clone() {
-            tag.title().as_ref().map(|artist| artist.to_string())
+            tag.artist().as_ref().map(|artist| artist.to_string())
         } else {
             None
         }
@@ -57,7 +56,7 @@ impl MetaData {
 
     pub fn album(&self) -> Option<String> {
         if let Some(tag) = &self.tag.clone() {
-            tag.title().as_ref().map(|album| album.to_string())
+            tag.album().as_ref().map(|album| album.to_string())
         } else {
             None
         }

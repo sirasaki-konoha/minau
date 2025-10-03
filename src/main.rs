@@ -1,8 +1,8 @@
 mod display_image;
-mod m3u;
 mod display_info;
 mod info;
 mod input;
+mod m3u;
 mod macros;
 mod play_music;
 mod player;
@@ -56,9 +56,10 @@ async fn main() {
     for path in args.files {
         let path_extens: &Path = path.as_ref();
         if let Some(ext) = path_extens.extension()
-            && ext == "m3u" {
-                m3u::play_m3u(&path, volume, args.gui).await;
-            }
+            && ext == "m3u"
+        {
+            m3u::play_m3u(&path, volume, args.gui).await;
+        }
 
         play_music::play_music(&path, volume, args.gui).await;
     }

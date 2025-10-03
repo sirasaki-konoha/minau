@@ -160,7 +160,7 @@ fn update_progress(pb: &ProgressBar, current: u64, total: u64) {
 fn cleanup_and_exit(pb: &ProgressBar, metadata: MetaData, path: &str) {
     let text_width = UnicodeWidthStr::width(display_info::string_info(path, &metadata).as_str());
     let (cols, _rows) = terminal::size().unwrap_or((80, 24));
-    let lines_needed = ((text_width as u16 + cols - 1) / cols).max(1) - 1;
+    let lines_needed = (text_width as u16).div_ceil(cols).max(1) - 1;
 
     for _ in 0..lines_needed {
         execute!(

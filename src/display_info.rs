@@ -28,8 +28,8 @@ pub fn string_info(filename: &str, metadata: &MetaData) -> String {
     .collect();
 
     if parts.is_empty() || metadata.title().is_none() {
-        format!("{}", filename)
+        filename.to_string()
     } else {
-        format!("{}", parts.concat())
+        parts.concat().to_string()
     }
 }

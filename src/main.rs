@@ -1,11 +1,12 @@
 mod display_image;
+mod m3u;
 mod display_info;
 mod info;
 mod input;
 mod macros;
 mod play_music;
 mod player;
-use std::process::exit;
+use std::{path::Path, process::exit};
 
 use clap::Parser;
 
@@ -53,6 +54,13 @@ async fn main() {
     }
 
     for path in args.files {
-        play_music::play_music(path, volume, args.gui).await;
+        let path_extens: &Path = path.as_ref();
+        if let Some(ext) = path_extens.extension() {
+            if ext == "m3u" {
+                m3u::play_m3u(&path, volume, args.gui).await;
+            }
+        }
+
+        play_music::play_music(&path, volume, args.gui).await;
     }
 }

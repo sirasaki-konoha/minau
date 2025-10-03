@@ -32,6 +32,10 @@ pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData) {
     window
         .update_with_buffer(&buffer, last_width, last_height)
         .unwrap();
+    thread::sleep(Duration::from_millis(100));
+    window
+        .update_with_buffer(&buffer, last_width, last_height)
+        .unwrap();
 
     while window.is_open()
         && !window.is_key_down(minifb::Key::Escape)

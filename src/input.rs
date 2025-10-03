@@ -5,7 +5,7 @@ use crate::{
 };
 use crossterm::{
     cursor::{Hide, Show},
-    event::{Event, KeyCode, poll, read},
+    event::{Event, KeyCode, KeyEventKind, poll, read},
     execute,
     style::Stylize,
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -69,6 +69,10 @@ pub async fn get_input(
         });
 
         if let Event::Key(key) = event {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
             match key.code {
                 KeyCode::Char('q') => {
                     info("Exitting...");

@@ -23,7 +23,10 @@ A lightweight, efficient command-line music player built with Rust using the *ro
 - 💻 **Cross-platform** - Works on Windows, macOS, and Linux
 - ⚡ **Low Resource Usage** - Efficient even in resource-constrained environments
 - 🎛️ **Easy to Use** - Intuitive command-line interface
-- ⌨️ **Keyboard Controls** - Pause/play, skip tracks, and adjust volume during playback
+- ⌨️ **Keyboard Controls** - Pause/play, skip tracks, adjust volume, and seek through tracks
+- 📃 **M3U Playlist Support** - Play music from M3U playlist files
+- 🔄 **Async Support** - Built with async/await for better performance
+- ⏩ **Seek Control** - Jump forward or backward within tracks using keyboard shortcuts
 
 ## Installation
 
@@ -110,8 +113,10 @@ During playback, you can use the following keyboard shortcuts:
 | `Space` | Toggle pause/play |
 | `q` | Quit the player |
 | `Right Key` or `Shift + .` (>) | Skip to next track |
-| `-` or `_` | Decrease volume by 5 |
-| `+` or `=` | Increase volume by 5 |
+| `-` or `_` or `j` | Decrease volume by 5 |
+| `+` or `=` or `k` | Increase volume by 5 |
+| `h` | Seek backward by 5 seconds |
+| `l` | Seek forward by 5 seconds |
 
 ### Examples
 
@@ -140,16 +145,19 @@ minau album.flac --gui --volume 60
 - **`<FILES>...`** - One or more audio files to play (required)
   - Type: `Vec<String>`
   - Accepts multiple file paths
-  - Supports various audio formats
+  - Supports various audio formats including M3U playlists
+  - Can handle both absolute and relative paths
 
-- **`--volume <VOLUME>`** - Playback volume level (optional)
-  - Type: `u32`
+- **`--volume <VOLUME>, -v`** - Playback volume level (optional)
+  - Type: `u16`
   - Range: 1-100
   - Default: 100 (maximum volume)
+  - Values outside range will cause an error
 
-- **`--gui`** - Enable GUI mode to display album artwork (optional)
+- **`--gui, -g`** - Enable GUI mode to display album artwork (optional)
   - Shows embedded album art from audio file metadata
   - Works with files that have embedded cover images
+  - Uses a native window for display
 
 ## Supported Audio Formats
 

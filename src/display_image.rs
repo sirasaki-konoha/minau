@@ -1,7 +1,7 @@
-use crate::err;
+use crate::{err, info::info};
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-use std::process::exit;
+use std::{process::exit, thread, time::Duration};
 
 pub fn display(data: Vec<u8>, path: String) {
     let img = image::load_from_memory(&data).unwrap_or_else(|e| {
@@ -37,6 +37,8 @@ pub fn display(data: Vec<u8>, path: String) {
         && !window.is_key_down(minifb::Key::Escape)
         && !window.is_key_down(minifb::Key::Q)
     {
+        
+        thread::sleep(Duration::from_millis(100));
         let (width, height) = window.get_size();
 
         if width != last_width || height != last_height {
@@ -54,10 +56,12 @@ pub fn display(data: Vec<u8>, path: String) {
 
             last_width = width;
             last_height = height;
+            info(format!("Resized image: {}x{}", width, height));
+            window
+                .update_with_buffer(&buffer, last_width, last_height)
+                .unwrap();
+        } else {
+            window.update();
         }
-
-        window
-            .update_with_buffer(&buffer, last_width, last_height)
-            .unwrap();
     }
 }

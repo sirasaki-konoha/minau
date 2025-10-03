@@ -47,7 +47,10 @@ pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     });
 
     if gui && let Some(pic) = metadata.picture() {
-        unsafe { env::set_var("WAYLAND_DISPLAY", "") };
+        if cfg!(target_os = "linux") && env::var("WAYLAND_DISPLAY").is_ok() {
+            unsafe { env ::remove_var("WAYLAND_DISPLAY") };
+        }
+
         display_image::display(pic, path_display);
     }
 

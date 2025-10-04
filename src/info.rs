@@ -61,17 +61,40 @@ pub fn info_with_restore<P: AsRef<str>>(
             )
             .unwrap();
         }
-
-        // execute!(
-        //     std::io::stdout(),
-        //     cursor::MoveToPreviousLine(1),
-        //     cursor::MoveToColumn(0),
-        //     Clear(ClearType::CurrentLine)
-        // )
-        // .unwrap_or_else(|e| {
-        //     err!("Failed to display info: {}", e);
-        //     exit(1);
-        // });
         crate::display_info::display_info(&filename, &metadata);
+    });
+}
+
+pub fn info_with_restore_url<P: AsRef<str>>(msg: P, url: &str) {
+    let url = String::from(url);
+    info(msg);
+
+    tokio::spawn(async move {
+        let call_time = Instant::now();
+        {
+            *LAST_CALL.lock().await = Some(call_time);
+        }
+
+        sleep(Duration::from_millis(2400)).await;
+
+        let last = LAST_CALL.lock().await;
+        if last.is_some_and(|t| t != call_time) {
+            return;
+        }
+
+        let text_width = UnicodeWidthStr::width(url.as_str());
+        let (cols, _rows) = terminal::size().unwrap_or((80, 24));
+        let lines_needed = (text_width as u16).div_ceil(cols).max(1);
+
+        for _ in 0..lines_needed {
+            execute!(
+                std::io::stdout(),
+                MoveToPreviousLine(1),
+                Clear(ClearType::CurrentLine),
+            )
+            .unwrap();
+        }
+
+        println!("{}", url);
     });
 }

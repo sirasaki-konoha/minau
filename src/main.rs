@@ -5,6 +5,7 @@ mod input;
 mod m3u;
 mod macros;
 mod play_music;
+mod play_url;
 mod player;
 use std::{path::Path, process::exit};
 
@@ -59,6 +60,13 @@ async fn main() {
             && ext == "m3u"
         {
             m3u::play_m3u(&path, volume, args.gui).await;
+            continue;
+        }
+
+        let bind = path.clone();
+        if bind.starts_with("http") || bind.starts_with("https://") {
+            play_url::play_url(&path, volume).await;
+            continue;
         }
 
         play_music::play_music(&path, volume, args.gui).await;

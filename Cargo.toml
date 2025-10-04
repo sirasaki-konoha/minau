@@ -7,15 +7,19 @@ authors = ["sirasaki-konoha <konoha@pik6c.tech>"]
 description = "A simple, minimal music player"
 
 [dependencies]
+bytes = "1.10.1"
 clap = { version = "4.5.48", features = ["derive"] }
 crossterm = "0.29.0"
+futures-util = "0.3.31"
 humantime = "2.3.0"
 image = "0.25.8"
 indicatif = "0.18.0"
 lofty = "0.22.4"
 minifb = "0.28.0"
 once_cell = "1.21.3"
-rodio = "0.21.1"
+reqwest = { version = "0.12.23", features = ["stream"] }
+symphonia = { version = "0.5", features = ["mp3", "aac", "flac", "vorbis"] }
+rodio = "0.21"
 tokio = { version = "1.47.1", features = ["full"] }
 unicode-width = "0.2.1"
 

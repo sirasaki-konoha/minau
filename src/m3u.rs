@@ -1,4 +1,4 @@
-use crate::{err, play_music};
+use crate::{err, play_music, play_url};
 use std::{fs, path::Path, process::exit};
 
 fn parse(m3u: &str) -> Vec<String> {
@@ -19,7 +19,7 @@ pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     for file in parse(&content) {
         // TODO: Support url case
         if file.starts_with("http://") || file.starts_with("https://") {
-            err!("{}: minau is not supporting url", &file);
+            play_url::play_url(&file, volume).await;
             continue;
         }
 

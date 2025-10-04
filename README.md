@@ -27,6 +27,7 @@ A lightweight, efficient command-line music player built with Rust using the *ro
 - 📃 **M3U Playlist Support** - Play music from M3U playlist files
 - 🔄 **Async Support** - Built with async/await for better performance
 - ⏩ **Seek Control** - Jump forward or backward within tracks using keyboard shortcuts
+- 🌐 **URL Streaming** - Stream audio directly from HTTP/HTTPS URLs
 
 ## Installation
 
@@ -68,6 +69,26 @@ Play all audio files in a directory:
 
 ```bash
 minau path/to/music/folder/*
+```
+
+### URL Streaming
+
+Stream audio directly from URLs:
+
+```bash
+minau https://example.com/audio.mp3
+```
+
+Stream with volume control:
+
+```bash
+minau https://example.com/stream.mp3 --volume 50
+```
+
+Multiple URL support:
+
+```bash
+minau https://example.com/1.mp3 https://example.com/2.mp3
 ```
 
 ### Volume Control
@@ -141,12 +162,12 @@ minau album.flac --gui --volume 60
 ```
 
 ## Command-line Arguments
-
-- **`<FILES>...`** - One or more audio files to play (required)
+- **`<FILES>...`** - One or more audio files or URLs to play (required)
   - Type: `Vec<String>`
-  - Accepts multiple file paths
+  - Accepts file paths and HTTP/HTTPS URLs
   - Supports various audio formats including M3U playlists
   - Can handle both absolute and relative paths
+  - Can stream audio from remote URLs
 
 - **`--volume <VOLUME>, -v`** - Playback volume level (optional)
   - Type: `u16`

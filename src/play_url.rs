@@ -2,14 +2,14 @@ use crate::input::deinit;
 use crate::{err, input};
 use bytes::Bytes;
 use crossterm::cursor::MoveToPreviousLine;
-use crossterm::terminal::{self, Clear, ClearType};
+use crossterm::terminal::{self, Clear, ClearType, SetTitle};
 use crossterm::{cursor, execute};
 use rodio::{OutputStream, OutputStreamBuilder, Sink, Source};
 use unicode_width::UnicodeWidthStr;
 use std::io::{self, stdout, Read, Result as IoResult, Write};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{env, thread};
 use std::time::Duration;
 use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
 use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
@@ -408,7 +408,8 @@ pub async fn play_url(url: &str, volume: f32) {
         url.to_string(),
         key_state.clone()
     ));
-
+    
+    set_terminal_title(url);
     
     let mut first = false;
 
@@ -421,8 +422,8 @@ pub async fn play_url(url: &str, volume: f32) {
         if !first {
             execute!(
                 stdout(),
-                cursor::MoveToNextLine(1),
-                Clear(crossterm::terminal::ClearType::FromCursorDown)
+                cursor::MoveToColumn(0),
+                Clear(ClearType::CurrentLine)
             ).unwrap();
         } else {
             first = !first;
@@ -463,6 +464,17 @@ pub async fn play_url(url: &str, volume: f32) {
 }
 
 
+fn set_terminal_title(url: &str) {
+    execute!(stdout(), SetTitle(format!("{}", url))).unwrap();
+}
+
+fn reset_terminal_title() {
+    let cwd = env::current_dir().unwrap().display().to_string();
+    execute!(stdout(), SetTitle(cwd)).unwrap();
+    print!("\x1b]2;\x07");
+    stdout().flush().unwrap();
+}
+
 fn cleanup_and_exit(url: &str){
     let text_width = UnicodeWidthStr::width(url);
     let (cols, _rows) = terminal::size().unwrap_or((80, 24));
@@ -484,5 +496,6 @@ fn cleanup_and_exit(url: &str){
         .unwrap();
     }
 
+    reset_terminal_title();
     deinit();
 }

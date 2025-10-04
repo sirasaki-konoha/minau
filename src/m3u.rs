@@ -4,7 +4,7 @@ use std::{fs, path::Path, process::exit};
 fn parse(m3u: &str) -> Vec<String> {
     m3u.lines()
         .map(|line| line.trim())
-        .filter(|line| !line.is_empty() || !line.starts_with('#'))
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(String::from)
         .collect()
 }

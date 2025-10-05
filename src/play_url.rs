@@ -5,13 +5,12 @@ use crossterm::cursor::MoveToPreviousLine;
 use crossterm::terminal::{self, Clear, ClearType, SetTitle};
 use crossterm::{cursor, execute};
 use rodio::cpal::traits::HostTrait;
-use rodio::{cpal, OutputStream, OutputStreamBuilder, Sink, Source};
-use unicode_width::UnicodeWidthStr;
-use std::io::{self, stdout, Read, Result as IoResult, Write};
+use rodio::{OutputStream, OutputStreamBuilder, Sink, Source, cpal};
+use std::io::{self, Read, Result as IoResult, Write, stdout};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::{env, thread};
 use std::time::Duration;
+use std::{env, thread};
 use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
 use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
 use symphonia::core::errors::Error;
@@ -20,6 +19,7 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use tokio::sync::mpsc;
+use unicode_width::UnicodeWidthStr;
 
 // 非同期ストリームを同期的なReadに変換するアダプター
 struct StreamReader {
@@ -63,15 +63,16 @@ impl Read for StreamReader {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         loop {
             if let Some(chunk) = &self.current
-                && self.offset < chunk.len() {
-                    let remaining = chunk.len() - self.offset;
-                    let to_copy = remaining.min(buf.len());
+                && self.offset < chunk.len()
+            {
+                let remaining = chunk.len() - self.offset;
+                let to_copy = remaining.min(buf.len());
 
-                    buf[..to_copy].copy_from_slice(&chunk[self.offset..self.offset + to_copy]);
+                buf[..to_copy].copy_from_slice(&chunk[self.offset..self.offset + to_copy]);
 
-                    self.offset += to_copy;
-                    return Ok(to_copy);
-                }
+                self.offset += to_copy;
+                return Ok(to_copy);
+            }
 
             match self.rx.blocking_recv() {
                 Some(chunk) => {
@@ -207,13 +208,12 @@ pub struct UrlPlayer {
 
 impl UrlPlayer {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        
         let default_device = cpal::default_host()
             .default_output_device()
             .expect("Available output device not found");
 
         let mut stream = OutputStreamBuilder::default()
-        .with_buffer_size(rodio::cpal::BufferSize::Default)
+            .with_buffer_size(rodio::cpal::BufferSize::Default)
             .with_device(default_device)
             .open_stream()
             .unwrap_or_else(|e| {
@@ -262,7 +262,7 @@ impl UrlPlayer {
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
-    
+
     pub fn channels(&self) -> u32 {
         self.channel
     }
@@ -406,7 +406,8 @@ pub async fn setup_url_player(
 
 pub async fn play_url(url: &str, volume: f32) {
     let p = setup_url_player(url, volume).await.unwrap();
-    println!("{}kHz/{}ch | Unknown",
+    println!(
+        "{}kHz/{}ch | Unknown",
         p.sample_rate() as f32 / 1000.0,
         p.channels()
     );
@@ -417,32 +418,33 @@ pub async fn play_url(url: &str, volume: f32) {
     let thread = tokio::spawn(input::get_input_url_mode(
         Arc::clone(&player),
         url.to_string(),
-        key_state.clone()
+        key_state.clone(),
     ));
-    
+
     set_terminal_title(url);
-    
+
     let mut first = false;
 
     loop {
         thread::sleep(Duration::from_millis(200));
-        
+
         let locked = Arc::clone(&player);
         let locked = locked.lock().unwrap();
-        
+
         if !first {
             execute!(
                 stdout(),
                 cursor::MoveToColumn(0),
                 Clear(ClearType::CurrentLine)
-            ).unwrap();
+            )
+            .unwrap();
         } else {
             first = !first;
         }
 
         if let Some(progress) = locked.get_download_progress() {
-
-            print!("{:.1}% ({:.2} / {:.2} MB)",
+            print!(
+                "{:.1}% ({:.2} / {:.2} MB)",
                 progress,
                 locked.get_downloaded_mb(),
                 locked.get_total_mb().unwrap(),
@@ -475,7 +477,6 @@ pub async fn play_url(url: &str, volume: f32) {
     }
 }
 
-
 fn set_terminal_title(url: &str) {
     execute!(stdout(), SetTitle(url.to_string())).unwrap();
 }
@@ -487,7 +488,7 @@ fn reset_terminal_title() {
     stdout().flush().unwrap();
 }
 
-fn cleanup_and_exit(url: &str){
+fn cleanup_and_exit(url: &str) {
     let text_width = UnicodeWidthStr::width(url);
     let (cols, _rows) = terminal::size().unwrap_or((80, 24));
     let lines_needed = (text_width as u16).div_ceil(cols).max(1) - 1;

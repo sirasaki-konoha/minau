@@ -4,6 +4,11 @@ use bytes::Bytes;
 use crossterm::cursor::MoveToPreviousLine;
 use crossterm::terminal::{self, Clear, ClearType, SetTitle};
 use crossterm::{cursor, execute};
+use http_body_util::BodyExt;
+use hyper::Request;
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
+use hyper_tls::HttpsConnector;
 use rodio::cpal::traits::HostTrait;
 use rodio::{OutputStream, OutputStreamBuilder, Sink, Source, cpal};
 use std::io::{self, Read, Result as IoResult, Write, stdout};
@@ -21,14 +26,15 @@ use symphonia::core::probe::Hint;
 use tokio::sync::mpsc;
 use unicode_width::UnicodeWidthStr;
 
-// 非同期ストリームを同期的なReadに変換するアダプター
 struct StreamReader {
     rx: mpsc::Receiver<Bytes>,
     current: Option<Bytes>,
     offset: usize,
+    buffer: Vec<u8>,
+    prebuffer_size: usize,
+    prebuffered: bool,
 }
 
-// MediaSource trait implementation for StreamReader
 impl symphonia::core::io::MediaSource for StreamReader {
     fn is_seekable(&self) -> bool {
         false
@@ -39,7 +45,6 @@ impl symphonia::core::io::MediaSource for StreamReader {
     }
 }
 
-// Implement Seek for StreamReader (not supported)
 impl std::io::Seek for StreamReader {
     fn seek(&mut self, _: std::io::SeekFrom) -> IoResult<u64> {
         Err(std::io::Error::new(
@@ -55,12 +60,52 @@ impl StreamReader {
             rx,
             current: None,
             offset: 0,
+            buffer: Vec::new(),
+            prebuffer_size: 64 * 1024, // 512KB -> 64KB に削減
+            prebuffered: false,
         }
+    }
+
+    fn prebuffer(&mut self) -> IoResult<()> {
+        if self.prebuffered {
+            return Ok(());
+        }
+
+        while self.buffer.len() < self.prebuffer_size {
+            match self.rx.blocking_recv() {
+                Some(chunk) => {
+                    self.buffer.extend_from_slice(&chunk);
+                }
+                None => {
+                    if !self.buffer.is_empty() {
+                        break;
+                    }
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "Stream ended before prebuffering completed",
+                    ));
+                }
+            }
+        }
+
+        self.prebuffered = true;
+        Ok(())
     }
 }
 
 impl Read for StreamReader {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+        if !self.prebuffered {
+            self.prebuffer()?;
+        }
+
+        if !self.buffer.is_empty() {
+            let to_copy = self.buffer.len().min(buf.len());
+            buf[..to_copy].copy_from_slice(&self.buffer[..to_copy]);
+            self.buffer.drain(..to_copy);
+            return Ok(to_copy);
+        }
+
         loop {
             if let Some(chunk) = &self.current
                 && self.offset < chunk.len()
@@ -85,7 +130,6 @@ impl Read for StreamReader {
     }
 }
 
-// Symphoniaでデコードしたサンプルを保持するソース
 pub struct SymphoniaSource {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn symphonia::core::codecs::Decoder>,
@@ -294,39 +338,78 @@ pub async fn setup_url_player(
     url: &str,
     volume: f32,
 ) -> Result<UrlPlayer, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .build()?;
+    let https = HttpsConnector::new();
+    let client: Client<_, String> = Client::builder(TokioExecutor::new()).build(https);
 
-    let response = client.get(url).send().await?;
+    let mut current_url = url.to_string();
+    let mut redirect_count = 0;
+    let max_redirects = 10;
 
-    if !response.status().is_success() {
-        return Err(format!("HTTP Error: {}", response.status()).into());
-    }
+    let response = loop {
+        let uri = current_url.parse::<hyper::Uri>()?;
+        let req = Request::builder()
+            .uri(uri)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .body(String::new())?;
 
-    // Content-Lengthヘッダーから総サイズを取得
-    let total_bytes = response.content_length();
+        let resp = client.request(req).await?;
+        let status = resp.status();
 
-    let (tx, rx) = mpsc::channel::<Bytes>(64);
+        if status.is_redirection() {
+            if redirect_count >= max_redirects {
+                return Err("Too many redirects".into());
+            }
+
+            if let Some(location) = resp.headers().get("location") {
+                current_url = location.to_str()?.to_string();
+                
+                if !current_url.starts_with("http") {
+                    let base_uri = url.parse::<hyper::Uri>()?;
+                    let scheme = base_uri.scheme_str().unwrap_or("https");
+                    let authority = base_uri.authority().ok_or("No authority in URL")?;
+                    current_url = format!("{}://{}{}", scheme, authority, current_url);
+                }
+                
+                redirect_count += 1;
+                continue;
+            } else {
+                return Err("Redirect without Location header".into());
+            }
+        }
+
+        if !status.is_success() {
+            return Err(format!("HTTP Error: {}", status).into());
+        }
+
+        break resp;
+    };
+
+    let total_bytes = response
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
+
+    let (tx, rx) = mpsc::channel::<Bytes>(1024); // 512 -> 1024に増加
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));
     let downloaded_clone = Arc::clone(&downloaded_bytes);
 
-    // 非同期タスクでストリームを受信
     tokio::spawn(async move {
-        let mut response = response;
+        let mut body = response.into_body();
 
-        loop {
-            match response.chunk().await {
-                Ok(Some(chunk)) => {
-                    let chunk_size = chunk.len() as u64;
-                    *downloaded_clone.lock().unwrap() += chunk_size;
+        while let Some(result) = body.frame().await {
+            match result {
+                Ok(frame) => {
+                    if let Some(chunk) = frame.data_ref() {
+                        let chunk_size = chunk.len() as u64;
+                        *downloaded_clone.lock().unwrap() += chunk_size;
 
-                    if tx.send(chunk).await.is_err() {
-                        break;
+                        if tx.send(chunk.clone()).await.is_err() {
+                            break;
+                        }
                     }
                 }
-                Ok(None) => break,
                 Err(e) => {
                     err!("Stream Error: {}", e);
                     break;
@@ -335,23 +418,40 @@ pub async fn setup_url_player(
         }
     });
 
-    // 別スレッドでsymphonia + rodioのセットアップ
-    let url_owned = url.to_string();
     let downloaded_bytes_clone = Arc::clone(&downloaded_bytes);
     let player = std::thread::spawn(
         move || -> Result<UrlPlayer, Box<dyn std::error::Error + Send + Sync>> {
-            let reader = StreamReader::new(rx);
-            let mss = MediaSourceStream::new(Box::new(reader), Default::default());
+            let mut reader = StreamReader::new(rx);
+            
+            let buffered_size = 128 * 1024; // 1MB -> 128KB に削減
 
             let mut hint = Hint::new();
-            // URLから拡張子を推測
-            if url_owned.contains(".mp3") {
-                hint.with_extension("mp3");
-            } else if url_owned.contains(".flac") {
-                hint.with_extension("flac");
-            } else if url_owned.contains(".ogg") {
-                hint.with_extension("ogg");
+            
+            reader.prebuffer()?;
+
+            // ファイルタイプ検出のためのバッファサイズを削減
+            let detect_size = reader.buffer.len().min(2000);
+            if let Some(kind) = infer::get(&reader.buffer[..detect_size]) {
+                match kind.mime_type() {
+                    "audio/mpeg" => hint.with_extension("mp3"),
+                    "audio/flac" => hint.with_extension("flac"),
+                    "audio/ogg" => hint.with_extension("ogg"),
+                    "audio/wav" => hint.with_extension("wav"),
+                    "audio/aac" => hint.with_extension("aac"),
+                    "audio/mp4" => hint.with_extension("m4a"),
+                    _ => {
+                        err!("Stream is not supported mime type!");
+                        exit(1);
+                    }
+                };
             }
+
+            let mss = MediaSourceStream::new(
+                Box::new(reader),
+                symphonia::core::io::MediaSourceStreamOptions {
+                    buffer_len: buffered_size,
+                }
+            );
 
             let meta_opts: MetadataOptions = Default::default();
             let fmt_opts: FormatOptions = Default::default();
@@ -461,17 +561,6 @@ pub async fn play_url(url: &str, volume: f32, title_override: Option<String>) {
             print!("({:.2} MB)", locked.get_downloaded_mb());
         }
         io::stdout().flush().unwrap();
-
-        // pb.set_length(locked.get_downloaded_bytes());
-        // if let Some(progress) = locked.get_download_progress() {
-        //     pb.set_message(format!(
-        //         "{:.1}% ({:.2}/{:.2} MB)",
-        //         progress,
-        //         locked.get_downloaded_mb(),
-        //         locked.get_total_mb().unwrap()
-        //     ));
-        //     dbg!("locked");
-        // };
 
         if thread.is_finished() {
             cleanup_and_exit(&title);

@@ -46,7 +46,11 @@ const VOLUME_STEP: f32 = 0.05;
 const POLL_INTERVAL_MS: u64 = 100;
 const SEEK_STEP_SECS: u64 = 5;
 
-pub async fn get_input_url_mode(url_player: Arc<Mutex<UrlPlayer>>, url: String, key_state: Arc<Mutex<bool>>) {
+pub async fn get_input_url_mode(
+    url_player: Arc<Mutex<UrlPlayer>>,
+    url: String,
+    key_state: Arc<Mutex<bool>>,
+) {
     let url = url.as_str();
     init_terminal();
     loop {

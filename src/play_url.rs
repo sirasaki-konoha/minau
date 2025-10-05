@@ -4,7 +4,8 @@ use bytes::Bytes;
 use crossterm::cursor::MoveToPreviousLine;
 use crossterm::terminal::{self, Clear, ClearType, SetTitle};
 use crossterm::{cursor, execute};
-use rodio::{OutputStream, OutputStreamBuilder, Sink, Source};
+use rodio::cpal::traits::HostTrait;
+use rodio::{cpal, OutputStream, OutputStreamBuilder, Sink, Source, StreamError};
 use unicode_width::UnicodeWidthStr;
 use std::io::{self, stdout, Read, Result as IoResult, Write};
 use std::process::exit;
@@ -206,10 +207,20 @@ pub struct UrlPlayer {
 
 impl UrlPlayer {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let mut stream = OutputStreamBuilder::open_default_stream().unwrap_or_else(|e| {
-            err!("Failed to open stream: {}", e);
-            exit(1);
-        });
+        
+        let default_device = cpal::default_host()
+            .default_output_device()
+            .expect("Available output device not found");
+
+        let mut stream = OutputStreamBuilder::default()
+        .with_buffer_size(rodio::cpal::BufferSize::Default)
+            .with_device(default_device)
+            .open_stream()
+            .unwrap_or_else(|e| {
+                err!("Failed to open stream: {}", e);
+                exit(1);
+            });
+
         let sink = Sink::connect_new(stream.mixer());
         stream.log_on_drop(false);
 
@@ -296,7 +307,7 @@ pub async fn setup_url_player(
     // Content-Lengthヘッダーから総サイズを取得
     let total_bytes = response.content_length();
 
-    let (tx, rx) = mpsc::channel::<Bytes>(32);
+    let (tx, rx) = mpsc::channel::<Bytes>(128);
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));
     let downloaded_clone = Arc::clone(&downloaded_bytes);
@@ -379,7 +390,7 @@ pub async fn setup_url_player(
             player.set_volume(volume);
             player.downloaded_bytes = downloaded_bytes_clone;
             *player.total_bytes.lock().unwrap() = total_bytes;
-            player.sink.append(source);
+            player.sink.append(source.buffered());
             player.channel = channels.count() as u32;
             player.sample_rate = sample_rate;
 
@@ -450,9 +461,10 @@ pub async fn play_url(url: &str, volume: f32) {
         //         locked.get_total_mb().unwrap()
         //     ));
         //     dbg!("locked");
-        // }
+        // };
 
         if thread.is_finished() {
+            cleanup_and_exit(url);
             break;
         }
         if locked.is_empty() {

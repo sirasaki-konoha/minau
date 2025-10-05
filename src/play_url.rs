@@ -405,7 +405,14 @@ pub async fn setup_url_player(
 }
 
 pub async fn play_url(url: &str, volume: f32, title_override: Option<String>) {
-    let p = setup_url_player(url, volume).await.unwrap();
+    let p = match setup_url_player(url, volume).await {
+        Ok(player) => player,
+        Err(e) => {
+            err!("Failed to setup url player: {}", e);
+            return;
+        }
+    };
+
     let title = title_override.unwrap_or_else(|| url.to_string());
     println!(
         "{}kHz/{}ch | Unknown",
@@ -418,7 +425,7 @@ pub async fn play_url(url: &str, volume: f32, title_override: Option<String>) {
     println!("{}", title);
     let thread = tokio::spawn(input::get_input_url_mode(
         Arc::clone(&player),
-        url.to_string(),
+        title.clone(),
         key_state.clone(),
     ));
 

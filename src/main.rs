@@ -10,6 +10,7 @@ mod player;
 use std::{path::Path, process::exit};
 
 use clap::Parser;
+use url::Url;
 
 #[derive(Parser)]
 #[command(name = env!("CARGO_PKG_NAME"))]
@@ -64,10 +65,14 @@ async fn main() {
         }
 
         let bind = path.clone();
-        if bind.starts_with("http") || bind.starts_with("https://") {
+        if let Ok(url) = Url::parse(&bind) {
+            if let Ok(file_url) = url.to_file_path() {
+                play_music::play_music(file_url.to_string_lossy().to_string(), volume, args.gui, None).await;
+                continue;
+            }
             play_url::play_url(&bind, volume, None).await;
             continue;
-        }
+        } 
 
         play_music::play_music(&path, volume, args.gui, None).await;
     }

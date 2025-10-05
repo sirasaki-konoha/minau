@@ -1,4 +1,6 @@
-use crate::{err, play_music, play_url};
+use url::Url;
+
+use crate::{err, play_music::{self, play_music}, play_url};
 use std::{fs, path::Path, process::exit};
 
 struct M3uEntry {
@@ -52,7 +54,11 @@ pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
     });
 
     for entry in parse(&content) {
-        if entry.path.starts_with("http://") || entry.path.starts_with("https://") {
+        if let Ok(url) = Url::parse(&entry.path) {
+            if let Ok(url_file) = url.to_file_path() {
+                play_music(url_file.to_string_lossy().to_string(), volume, gui, entry.title.clone()).await;
+                continue;
+            }
             play_url::play_url(&entry.path, volume, entry.title).await;
             continue;
         }

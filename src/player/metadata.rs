@@ -46,7 +46,13 @@ impl MetaData {
     }
 
     pub fn title(&self) -> Option<String> {
-        self.title.as_ref().map(|title| title.to_string())
+        if self.title.is_some() {
+            self.title.clone()
+        }else if let Some(tag) = &self.tag.clone() {
+            tag.title().as_ref().map(|title| title.to_string())
+        }else {
+            None
+        }
     }
 
     pub fn artist(&self) -> Option<String> {

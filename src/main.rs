@@ -56,11 +56,11 @@ async fn main() {
 
     for path in args.files {
         let path_extens: &Path = path.as_ref();
-        if let Some(ext) = path_extens.extension() {
-            if ext == "m3u" || ext == "m3u8" {
-                m3u::play_m3u(&path, volume, args.gui).await;
-                continue;
-            }
+        if let Some(ext) = path_extens.extension()
+            && (ext == "m3u" || ext == "m3u8")
+        {
+            m3u::play_m3u(&path, volume, args.gui).await;
+            continue;
         }
 
         let bind = path.clone();

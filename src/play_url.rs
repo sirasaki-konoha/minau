@@ -10,7 +10,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
 use hyper_tls::HttpsConnector;
 use rodio::cpal::traits::HostTrait;
-use rodio::{OutputStream, OutputStreamBuilder, Sink, Source, cpal};
+use rodio::{cpal, DeviceTrait, OutputStream, OutputStreamBuilder, Sink, Source};
 use std::io::{self, Read, Result as IoResult, Write, stdout};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
@@ -252,13 +252,16 @@ pub struct UrlPlayer {
 
 impl UrlPlayer {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let default_device = cpal::default_host()
+        let host = cpal::default_host();
+        let default_device = host
             .default_output_device()
             .expect("Available output device not found");
+        
+        let default_config = default_device.default_output_config().unwrap();
 
         let mut stream = OutputStreamBuilder::default()
-            .with_buffer_size(rodio::cpal::BufferSize::Default)
             .with_device(default_device)
+            .with_supported_config(&default_config)
             .open_stream()
             .unwrap_or_else(|e| {
                 err!("Failed to open stream: {}", e);

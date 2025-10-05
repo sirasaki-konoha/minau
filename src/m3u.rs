@@ -1,12 +1,47 @@
 use crate::{err, play_music, play_url};
 use std::{fs, path::Path, process::exit};
 
-fn parse(m3u: &str) -> Vec<String> {
-    m3u.lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(String::from)
-        .collect()
+struct M3uEntry {
+    path: String,
+    title: Option<String>,
+    #[allow(dead_code)]
+    duration: Option<i32>,
+}
+
+fn parse(m3u: &str) -> Vec<M3uEntry> {
+    let mut entries = Vec::new();
+    let mut current_title = None;
+    let mut current_duration = None;
+
+    // #EXTM3Uヘッダがない場合は、シンプルなM3Uとして扱う
+    if !m3u.lines().next().unwrap_or("").starts_with("#EXTM3U") {
+        return m3u
+            .lines()
+            .map(|line| line.trim())
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .map(|line| M3uEntry {
+                path: line.to_string(),
+                title: None,
+                duration: None,
+            })
+            .collect();
+    }
+
+    for line in m3u.lines().map(|l| l.trim()).filter(|l| !l.is_empty()) {
+        if line.starts_with("#EXTINF:") {
+            let info = line.strip_prefix("#EXTINF:").unwrap_or("").trim();
+            let mut parts = info.splitn(2, ',');
+            current_duration = parts.next().and_then(|s| s.parse::<i32>().ok());
+            current_title = parts.next().map(String::from);
+        } else if !line.starts_with('#') {
+            entries.push(M3uEntry {
+                path: line.to_string(),
+                title: current_title.take(),
+                duration: current_duration.take(),
+            });
+        }
+    }
+    entries
 }
 
 pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
@@ -16,23 +51,22 @@ pub async fn play_m3u<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
         exit(1);
     });
 
-    for file in parse(&content) {
-        // TODO: Support url case
-        if file.starts_with("http://") || file.starts_with("https://") {
-            play_url::play_url(&file, volume).await;
+    for entry in parse(&content) {
+        if entry.path.starts_with("http://") || entry.path.starts_with("https://") {
+            play_url::play_url(&entry.path, volume, entry.title).await;
             continue;
         }
 
-        let file_path = if Path::new(&file).is_absolute() {
-            file
+        let file_path = if Path::new(&entry.path).is_absolute() {
+            entry.path
         } else {
             path.parent()
                 .unwrap_or_else(|| Path::new("."))
-                .join(&file)
+                .join(&entry.path)
                 .to_string_lossy()
                 .to_string()
         };
 
-        play_music::play_music(file_path, volume, gui).await;
+        play_music::play_music(file_path, volume, gui, entry.title).await;
     }
 }

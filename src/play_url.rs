@@ -307,7 +307,7 @@ pub async fn setup_url_player(
     // Content-Lengthヘッダーから総サイズを取得
     let total_bytes = response.content_length();
 
-    let (tx, rx) = mpsc::channel::<Bytes>(128);
+    let (tx, rx) = mpsc::channel::<Bytes>(64);
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));
     let downloaded_clone = Arc::clone(&downloaded_bytes);
@@ -404,8 +404,9 @@ pub async fn setup_url_player(
     Ok(player)
 }
 
-pub async fn play_url(url: &str, volume: f32) {
+pub async fn play_url(url: &str, volume: f32, title_override: Option<String>) {
     let p = setup_url_player(url, volume).await.unwrap();
+    let title = title_override.unwrap_or_else(|| url.to_string());
     println!(
         "{}kHz/{}ch | Unknown",
         p.sample_rate() as f32 / 1000.0,
@@ -414,14 +415,14 @@ pub async fn play_url(url: &str, volume: f32) {
     let player = Arc::new(Mutex::new(p));
     let key_state = Arc::new(Mutex::new(false));
 
-    println!("{}", url);
+    println!("{}", title);
     let thread = tokio::spawn(input::get_input_url_mode(
         Arc::clone(&player),
         url.to_string(),
         key_state.clone(),
     ));
 
-    set_terminal_title(url);
+    set_terminal_title(&title);
 
     let mut first = false;
 
@@ -466,19 +467,19 @@ pub async fn play_url(url: &str, volume: f32) {
         // };
 
         if thread.is_finished() {
-            cleanup_and_exit(url);
+            cleanup_and_exit(&title);
             break;
         }
         if locked.is_empty() {
             *key_state.lock().unwrap() = true;
-            cleanup_and_exit(url);
+            cleanup_and_exit(&title);
             break;
         }
     }
 }
 
-fn set_terminal_title(url: &str) {
-    execute!(stdout(), SetTitle(url.to_string())).unwrap();
+fn set_terminal_title(title: &str) {
+    execute!(stdout(), SetTitle(title.to_string())).unwrap();
 }
 
 fn reset_terminal_title() {
@@ -488,8 +489,8 @@ fn reset_terminal_title() {
     stdout().flush().unwrap();
 }
 
-fn cleanup_and_exit(url: &str) {
-    let text_width = UnicodeWidthStr::width(url);
+fn cleanup_and_exit(title: &str) {
+    let text_width = UnicodeWidthStr::width(title);
     let (cols, _rows) = terminal::size().unwrap_or((80, 24));
     let lines_needed = (text_width as u16).div_ceil(cols).max(1) - 1;
 

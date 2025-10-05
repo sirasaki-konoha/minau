@@ -13,6 +13,7 @@ use crate::err;
 pub struct MetaData {
     pub tag: Option<Tag>,
     pub prop: FileProperties,
+    pub title: Option<String>,
 }
 
 impl MetaData {
@@ -29,18 +30,24 @@ impl MetaData {
             return Self {
                 tag: None,
                 prop: bind.properties().clone(),
+                title: None,
             };
         };
 
         Self {
             tag: Some(s.clone()),
             prop: bind.properties().clone(),
+            title: None,
         }
+    }
+    
+    pub fn set_title(&mut self, title: Option<String>) {
+        self.title = title
     }
 
     pub fn title(&self) -> Option<String> {
-        if let Some(tag) = &self.tag.clone() {
-            tag.title().as_ref().map(|title| title.to_string())
+        if let Some(title) = &self.title {
+            Some(title.to_string())
         } else {
             None
         }

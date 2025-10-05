@@ -56,19 +56,19 @@ async fn main() {
 
     for path in args.files {
         let path_extens: &Path = path.as_ref();
-        if let Some(ext) = path_extens.extension()
-            && ext == "m3u"
-        {
-            m3u::play_m3u(&path, volume, args.gui).await;
-            continue;
+        if let Some(ext) = path_extens.extension() {
+            if ext == "m3u" || ext == "m3u8" {
+                m3u::play_m3u(&path, volume, args.gui).await;
+                continue;
+            }
         }
 
         let bind = path.clone();
         if bind.starts_with("http") || bind.starts_with("https://") {
-            play_url::play_url(&path, volume).await;
+            play_url::play_url(&bind, volume, None).await;
             continue;
         }
 
-        play_music::play_music(&path, volume, args.gui).await;
+        play_music::play_music(&path, volume, args.gui, None).await;
     }
 }

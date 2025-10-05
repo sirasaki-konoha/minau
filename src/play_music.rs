@@ -20,9 +20,17 @@ use unicode_width::UnicodeWidthStr;
 const TICK_INTERVAL_MS: u64 = 100;
 const TICKS_PER_SECOND: u32 = 4;
 
-pub async fn play_music<P: AsRef<Path>>(path: P, volume: f32, gui: bool) {
+pub async fn play_music<P: AsRef<Path>>(
+    path: P,
+    volume: f32,
+    gui: bool,
+    title_override: Option<String>,
+) {
     let player = Player::new(&path);
-    let metadata = player.metadata();
+    let mut metadata = player.metadata();
+    if let Some(title) = title_override {
+        metadata.set_title(Some(title));
+    }
     let close_gui = Arc::new(Mutex::new(false));
 
     let filename = path

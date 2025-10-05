@@ -5,7 +5,7 @@ use crossterm::cursor::MoveToPreviousLine;
 use crossterm::terminal::{self, Clear, ClearType, SetTitle};
 use crossterm::{cursor, execute};
 use rodio::cpal::traits::HostTrait;
-use rodio::{cpal, OutputStream, OutputStreamBuilder, Sink, Source, StreamError};
+use rodio::{cpal, OutputStream, OutputStreamBuilder, Sink, Source};
 use unicode_width::UnicodeWidthStr;
 use std::io::{self, stdout, Read, Result as IoResult, Write};
 use std::process::exit;
@@ -477,7 +477,7 @@ pub async fn play_url(url: &str, volume: f32) {
 
 
 fn set_terminal_title(url: &str) {
-    execute!(stdout(), SetTitle(format!("{}", url))).unwrap();
+    execute!(stdout(), SetTitle(url.to_string())).unwrap();
 }
 
 fn reset_terminal_title() {

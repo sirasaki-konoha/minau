@@ -1,4 +1,3 @@
-// play_url.rs - ランタイム混在問題の修正版
 use crate::input::deinit;
 use crate::{err, input};
 use async_channel::Receiver;

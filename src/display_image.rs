@@ -1,12 +1,8 @@
 use crate::{display_info::string_info, err, player::metadata::MetaData};
 use image::GenericImageView;
 use minifb::{Window, WindowOptions};
-use std::{
-    process::exit,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
+use parking_lot::Mutex;
+use std::{process::exit, sync::Arc, thread, time::Duration};
 
 pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData, close: Arc<Mutex<bool>>) {
     let img = image::load_from_memory(&data).unwrap_or_else(|e| {
@@ -47,7 +43,7 @@ pub fn display(data: Vec<u8>, filename: &str, metadata: MetaData, close: Arc<Mut
         && !window.is_key_down(minifb::Key::Q)
     {
         thread::sleep(Duration::from_millis(200));
-        if *close.lock().unwrap() {
+        if *close.lock() {
             break;
         }
 

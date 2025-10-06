@@ -48,9 +48,9 @@ impl MetaData {
     pub fn title(&self) -> Option<String> {
         if self.title.is_some() {
             self.title.clone()
-        }else if let Some(tag) = &self.tag.clone() {
+        } else if let Some(tag) = &self.tag.clone() {
             tag.title().as_ref().map(|title| title.to_string())
-        }else {
+        } else {
             None
         }
     }

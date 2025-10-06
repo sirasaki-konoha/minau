@@ -11,12 +11,8 @@ use crossterm::{
     style::Stylize,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
-use std::{
-    io::stdout,
-    process::exit,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use parking_lot::Mutex;
+use std::{io::stdout, process::exit, sync::Arc, time::Duration};
 
 pub fn init_terminal() {
     enable_raw_mode().unwrap_or_else(|e| {
@@ -54,7 +50,7 @@ pub async fn get_input_url_mode(
     let url = url.as_str();
     init_terminal();
     loop {
-        if *key_state.lock().unwrap() {
+        if *key_state.lock() {
             break;
         }
 
@@ -84,7 +80,7 @@ pub async fn get_input_url_mode(
                     return;
                 }
                 KeyCode::Char(' ') => {
-                    let play = url_player.lock().unwrap();
+                    let play = url_player.lock();
                     let msg = if play.is_paused() {
                         play.resume();
                         "|> Resumed"
@@ -131,7 +127,7 @@ pub async fn get_input(
     let path = path.as_str();
     init_terminal();
     loop {
-        if *quit.lock().unwrap() {
+        if *quit.lock() {
             return;
         }
 
@@ -161,7 +157,7 @@ pub async fn get_input(
                     return;
                 }
                 KeyCode::Char(' ') => {
-                    let mut play = music_play.lock().unwrap();
+                    let mut play = music_play.lock();
                     let msg = if play.is_paused() {
                         play.resume();
                         "|> Resumed"
@@ -178,7 +174,7 @@ pub async fn get_input(
                     adjust_volume(&music_play, -VOLUME_STEP, &filename, path, &metadata);
                 }
                 KeyCode::Char('l') => {
-                    let play = music_play.lock().unwrap();
+                    let play = music_play.lock();
                     let cur_pos = play.get_pos();
                     let new_pos = cur_pos + Duration::from_secs(SEEK_STEP_SECS);
                     if play.seek(new_pos).is_err() {
@@ -206,7 +202,7 @@ pub async fn get_input(
                     );
                 }
                 KeyCode::Char('h') => {
-                    let play = music_play.lock().unwrap();
+                    let play = music_play.lock();
                     let cur_pos = play.get_pos();
                     let new_pos = cur_pos.saturating_sub(Duration::from_secs(SEEK_STEP_SECS));
                     match play.seek(new_pos) {
@@ -254,7 +250,7 @@ pub async fn get_input(
 }
 
 fn adjust_volume_url(url_player: Arc<Mutex<UrlPlayer>>, delta: f32, url: &str) {
-    let play = url_player.lock().unwrap();
+    let play = url_player.lock();
     let vol = play.get_volume();
     let new_vol = (vol + delta).clamp(0.0, 1.0);
 
@@ -279,7 +275,7 @@ fn adjust_volume(
     path: &str,
     metadata: &MetaData,
 ) {
-    let mut play = music_play.lock().unwrap();
+    let mut play = music_play.lock();
     let vol = play.get_volume();
     let new_vol = (vol + delta).clamp(0.0, 1.0);
 

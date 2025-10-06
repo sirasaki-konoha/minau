@@ -1,3 +1,9 @@
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/sirasaki-konoha/minau/refs/heads/master/icon/minau-icon.png"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/sirasaki-konoha/minau/refs/heads/master/icon/minau-icon.png"
+)]
 mod display_image;
 mod display_info;
 mod info;
@@ -9,6 +15,7 @@ mod play_url;
 mod player;
 use std::{path::Path, process::exit};
 
+use async_compat::CompatExt;
 use clap::Parser;
 use url::Url;
 
@@ -31,8 +38,7 @@ const DEFAULT_VOLUME: u16 = 100;
 const MIN_VOLUME: u16 = 1;
 const MAX_VOLUME: u16 = 100;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args = Cli::parse();
 
     let volume = args
@@ -60,20 +66,34 @@ async fn main() {
         if let Some(ext) = path_extens.extension()
             && (ext == "m3u" || ext == "m3u8")
         {
-            m3u::play_m3u(&path, volume, args.gui).await;
+            smol::block_on(async {
+                m3u::play_m3u(&path, volume, args.gui).compat().await;
+            });
             continue;
         }
 
         let bind = path.clone();
         if let Ok(url) = Url::parse(&bind) {
             if let Ok(file_url) = url.to_file_path() {
-                play_music::play_music(file_url.to_string_lossy().to_string(), volume, args.gui, None).await;
+                smol::block_on(async {
+                    play_music::play_music(
+                        file_url.to_string_lossy().to_string(),
+                        volume,
+                        args.gui,
+                        None,
+                    )
+                    .await;
+                });
                 continue;
             }
-            play_url::play_url(&bind, volume, None).await;
+            smol::block_on(async {
+                play_url::play_url(&bind, volume, None).compat().await;
+            });
             continue;
-        } 
+        }
 
-        play_music::play_music(&path, volume, args.gui, None).await;
+        smol::block_on(async {
+            play_music::play_music(&path, volume, args.gui, None).await;
+        });
     }
 }

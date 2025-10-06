@@ -9,12 +9,13 @@ use crossterm::terminal::{Clear, SetTitle};
 use crossterm::{execute, terminal};
 use humantime::format_duration;
 use indicatif::{ProgressBar, ProgressStyle};
+use parking_lot::Mutex;
 use std::env;
 use std::io::{Write, stdout};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::thread::sleep;
 use std::time::Duration;
-use tokio::time::sleep;
 use unicode_width::UnicodeWidthStr;
 
 const TICK_INTERVAL_MS: u64 = 100;
@@ -52,10 +53,9 @@ pub async fn play_music<P: AsRef<Path>>(
     let bind = path_display.clone();
     let bind_clg = Arc::clone(&close_gui);
     let play_thread = std::thread::spawn(move || {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
+        smol::block_on(async {
             really_play(player_bind, value, file_clone, bind, volume).await;
-            let mut clg = bind_clg.lock().unwrap();
+            let mut clg = bind_clg.lock();
             *clg = true;
         });
     });
@@ -104,7 +104,7 @@ async fn really_play(
     let music_play = Arc::new(Mutex::new(player.play().set_volume(volume)));
     let key_state = Arc::new(Mutex::new(false));
 
-    let key_thread = tokio::spawn(get_input(
+    let key_thread = smol::spawn(get_input(
         Arc::clone(&music_play),
         Arc::clone(&key_state),
         filename.clone(),
@@ -123,20 +123,20 @@ async fn really_play(
             return;
         }
 
-        if music_play.lock().unwrap().is_empty() {
-            *key_state.lock().unwrap() = true;
+        if music_play.lock().is_empty() {
+            *key_state.lock() = true;
             cleanup_and_exit(&pb, metadata, &filename);
             return;
         }
 
-        sleep(Duration::from_millis(TICK_INTERVAL_MS)).await;
+        sleep(Duration::from_millis(TICK_INTERVAL_MS));
 
-        if !music_play.lock().unwrap().is_paused() {
+        if !music_play.lock().is_paused() {
             tick_count += 1;
 
             if tick_count >= TICKS_PER_SECOND {
                 tick_count = 0;
-                let current_secs = music_play.lock().unwrap().get_pos().as_secs();
+                let current_secs = music_play.lock().get_pos().as_secs();
                 update_progress(&pb, current_secs, duration_secs);
             }
         }

@@ -9,7 +9,7 @@ use crossterm::{
 use smol::Timer;
 use smol::lock::Mutex;
 use std::sync::Arc;
-use std::thread::{self, sleep};
+use std::thread;
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthStr;
 

@@ -22,9 +22,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
-use symphonia::core::codecs::{CODEC_TYPE_NULL, Decoder, DecoderOptions};
+use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
 use symphonia::core::errors::Error;
-use symphonia::core::formats::{FormatOptions, FormatReader};
+use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
@@ -157,7 +157,7 @@ fn convert_samples(buffer: AudioBufferRef) -> Vec<f32> {
 }
 
 pub struct UrlPlayer {
-    stream: Stream,
+    _stream: Stream,
     paused: Arc<AtomicBool>,
     volume: Arc<Mutex<f32>>,
     finished: Arc<AtomicBool>,
@@ -281,7 +281,6 @@ pub async fn setup_url_player(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
 
-
     // boundedチャネルを使用してバックプレッシャーを適用
     let (tx, rx) = async_channel::bounded::<Bytes>(50);
 
@@ -293,7 +292,6 @@ pub async fn setup_url_player(
         // 新しいsmolランタイムを作成
         smol::block_on(async {
             let mut body = response.into_body();
-            let mut chunk_count = 0;
 
             while let Some(result) = body.frame().await {
                 match result {
@@ -301,7 +299,6 @@ pub async fn setup_url_player(
                         if let Some(chunk) = frame.data_ref() {
                             let chunk_size = chunk.len() as u64;
                             *downloaded_clone.lock() += chunk_size;
-                            chunk_count += 1;
 
                             match tx.send(chunk.clone()).await {
                                 Ok(_) => {}
@@ -324,7 +321,7 @@ pub async fn setup_url_player(
     let downloaded_bytes_clone = Arc::clone(&downloaded_bytes);
     let player = std::thread::spawn(
         move || -> Result<UrlPlayer, Box<dyn std::error::Error + Send + Sync>> {
-            let mut reader = StreamReader::new(rx);
+            let reader = StreamReader::new(rx);
 
             // 初期バッファリング
             if !reader.wait_for_data(64 * 1024, Duration::from_secs(10)) {
@@ -507,7 +504,7 @@ pub async fn setup_url_player(
             stream.play()?;
 
             Ok(UrlPlayer {
-                stream,
+                _stream: stream,
                 paused,
                 volume: volume_arc,
                 finished,

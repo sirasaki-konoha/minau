@@ -1,17 +1,11 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Stream, StreamConfig};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use std::{fs::File, process::exit};
-use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
 use symphonia::core::codecs::{CODEC_TYPE_NULL, Decoder, DecoderOptions};
-use symphonia::core::errors::Error;
-use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo};
+use symphonia::core::formats::{FormatOptions, FormatReader};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
-use symphonia::core::units::Time;
 
 use crate::err;
 
@@ -56,7 +50,7 @@ impl Player {
                 exit(1);
             });
 
-        let mut format = probed.format;
+        let format = probed.format;
 
         let track = format
             .tracks()

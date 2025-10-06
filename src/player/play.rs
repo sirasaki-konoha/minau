@@ -3,7 +3,9 @@ use crate::player::player_structs::Player;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
 use ringbuf::HeapRb;
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -15,7 +17,7 @@ use symphonia::core::formats::{FormatReader, SeekTo};
 use symphonia::core::units::Time;
 
 pub struct MusicPlay {
-    stream: Stream,
+    _stream: Stream,
     seeking: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     volume: Arc<parking_lot::Mutex<f32>>,
@@ -24,8 +26,6 @@ pub struct MusicPlay {
     format: Arc<Mutex<Box<dyn FormatReader>>>,
     decoder: Arc<Mutex<Box<dyn Decoder>>>,
     track_id: u32,
-    sample_rate: u32,
-    output_sample_rate: u32,
 }
 unsafe impl Send for MusicPlay {}
 
@@ -57,10 +57,8 @@ impl Player {
         let decoder = Arc::clone(&self.decoder);
         let track_id = self.track_id;
 
-        let (mut producer, mut consumer) =
-            HeapRb::<f32>::new(output_sample_rate as usize).split();
+        let (mut producer, mut consumer) = HeapRb::<f32>::new(output_sample_rate as usize).split();
 
-        let paused_clone = Arc::clone(&paused);
         let position_clone = Arc::clone(&position);
         let finished_clone = Arc::clone(&finished);
         let seeking_clone = Arc::clone(&seeking);
@@ -74,7 +72,7 @@ impl Player {
             let mut current_index = 0;
             let mut frames_played = 0u64;
 
-            // リサンプラーの初期化
+
             let needs_resampling = input_sample_rate != output_sample_rate;
             let mut resampler: Option<SincFixedIn<f32>> = if needs_resampling {
                 let params = SincInterpolationParameters {
@@ -84,16 +82,17 @@ impl Player {
                     oversampling_factor: 256,
                     window: WindowFunction::BlackmanHarris2,
                 };
-                
+
+                let chunk_size = 1024; // 固定チャンクサイズ
+
                 match SincFixedIn::new(
                     output_sample_rate as f64 / input_sample_rate as f64,
                     2.0,
                     params,
-                    1024,
+                    chunk_size,
                     channels,
                 ) {
                     Ok(r) => {
-                        eprintln!("Resampling: {}Hz -> {}Hz", input_sample_rate, output_sample_rate);
                         Some(r)
                     }
                     Err(e) => {
@@ -105,6 +104,8 @@ impl Player {
                 None
             };
 
+            let mut resample_buffer = Vec::new();
+
             loop {
                 if finished_clone.load(Ordering::Relaxed) {
                     break;
@@ -113,13 +114,14 @@ impl Player {
                 if seeking_clone.load(Ordering::Relaxed) {
                     current_samples.clear();
                     current_index = 0;
-                    
+
                     // リサンプラーのリセット
                     if let Some(ref mut r) = resampler {
                         r.reset();
                     }
-                    
-                    frames_played = position_clone.load(Ordering::Relaxed) * output_sample_rate as u64;
+
+                    frames_played =
+                        position_clone.load(Ordering::Relaxed) * output_sample_rate as u64;
                     std::thread::sleep(Duration::from_millis(50));
                     continue;
                 }
@@ -152,43 +154,54 @@ impl Player {
                         match decoder.decode(&packet) {
                             Ok(decoded) => {
                                 let samples = convert_samples(decoded);
-                                
+
                                 // リサンプリングが必要な場合
                                 if let Some(ref mut resampler) = resampler {
-                                    let frames = samples.len() / channels;
-                                    
-                                    // チャンネルごとに分離
-                                    let mut channel_data = vec![vec![0.0f32; frames]; channels];
-                                    for (i, &sample) in samples.iter().enumerate() {
-                                        let ch = i % channels;
-                                        let frame = i / channels;
-                                        channel_data[ch][frame] = sample;
-                                    }
+                                    let chunk_size = resampler.input_frames_next();
 
-                                    // リサンプリング実行
-                                    match resampler.process(&channel_data, None) {
-                                        Ok(resampled) => {
-                                            // インターリーブ
-                                            let out_frames = resampled[0].len();
-                                            let mut interleaved = Vec::with_capacity(out_frames * channels);
-                                            
-                                            for frame in 0..out_frames {
-                                                for ch in 0..channels {
-                                                    interleaved.push(resampled[ch][frame]);
+                                    // 既存のバッファと新しいサンプルを結合
+                                    resample_buffer.extend_from_slice(&samples);
+
+                                    let mut resampled_output = Vec::new();
+
+                                    // chunk_sizeごとに処理
+                                    while resample_buffer.len() >= chunk_size * channels {
+                                        // チャンネルごとに分離
+                                        let mut channel_data =
+                                            vec![vec![0.0f32; chunk_size]; channels];
+                                        for frame in 0..chunk_size {
+                                            for ch in 0..channels {
+                                                let idx = frame * channels + ch;
+                                                channel_data[ch][frame] = resample_buffer[idx];
+                                            }
+                                        }
+
+                                        // リサンプリング実行（常にNoneを渡す = まだ続きがある）
+                                        match resampler.process(&channel_data, None) {
+                                            Ok(resampled) => {
+                                                // インターリーブ
+                                                let out_frames = resampled[0].len();
+                                                for frame in 0..out_frames {
+                                                    for ch in 0..channels {
+                                                        resampled_output.push(resampled[ch][frame]);
+                                                    }
                                                 }
                                             }
-                                            
-                                            current_samples = interleaved;
+                                            Err(e) => {
+                                                err!("Resampling error: {}", e);
+                                                break;
+                                            }
                                         }
-                                        Err(e) => {
-                                            err!("Resampling error: {}", e);
-                                            current_samples = samples;
-                                        }
+
+                                        // 処理済みデータをバッファから削除
+                                        resample_buffer.drain(0..chunk_size * channels);
                                     }
+
+                                    current_samples = resampled_output;
                                 } else {
                                     current_samples = samples;
                                 }
-                                
+
                                 current_index = 0;
                             }
                             Err(_) => continue,
@@ -209,7 +222,7 @@ impl Player {
                             if frames_played % (output_sample_rate as u64) == 0 {
                                 position_clone.store(
                                     frames_played / output_sample_rate as u64,
-                                    Ordering::Relaxed
+                                    Ordering::Relaxed,
                                 );
                             }
                         }
@@ -253,7 +266,7 @@ impl Player {
         });
 
         MusicPlay {
-            stream,
+            _stream: stream,
             seeking,
             paused,
             volume,
@@ -262,8 +275,6 @@ impl Player {
             format: self.format,
             decoder: self.decoder,
             track_id: self.track_id,
-            sample_rate: self.sample_rate,
-            output_sample_rate,
         }
     }
 }
@@ -310,8 +321,11 @@ impl MusicPlay {
     pub fn seek(&self, dur: Duration) -> Result<(), String> {
         let time_secs = dur.as_secs();
 
+        // シーク開始を通知
         self.seeking.store(true, Ordering::Relaxed);
-        std::thread::sleep(Duration::from_millis(20));
+        
+        // デコーダースレッドが確実に停止するまで待機
+        std::thread::sleep(Duration::from_millis(100));
 
         let mut format = self.format.lock().unwrap();
         let mut decoder = self.decoder.lock().unwrap();
@@ -327,7 +341,11 @@ impl MusicPlay {
 
         decoder.reset();
 
+        // 位置を先に更新してからシーク完了フラグを立てる
         self.position.store(time_secs, Ordering::Relaxed);
+        
+        // 少し待ってからシーク完了を通知
+        std::thread::sleep(Duration::from_millis(50));
         self.seeking.store(false, Ordering::Relaxed);
 
         Ok(())

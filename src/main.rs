@@ -73,28 +73,27 @@ fn main() {
         }
 
         let bind = path.clone();
-        if bind.starts_with("file://")
+        if (bind.starts_with("file://")
             || bind.starts_with("http://")
-            || bind.starts_with("https://")
+            || bind.starts_with("https://"))
+            && let Ok(url) = Url::parse(&bind)
         {
-            if let Ok(url) = Url::parse(&bind) {
-                if let Ok(file_url) = url.to_file_path() {
-                    smol::block_on(async {
-                        play_music::play_music(
-                            file_url.to_string_lossy().to_string(),
-                            volume,
-                            args.gui,
-                            None,
-                        )
-                        .await;
-                    });
-                    continue;
-                }
+            if let Ok(file_url) = url.to_file_path() {
                 smol::block_on(async {
-                    play_url::play_url(&bind, volume, None).compat().await;
+                    play_music::play_music(
+                        file_url.to_string_lossy().to_string(),
+                        volume,
+                        args.gui,
+                        None,
+                    )
+                    .await;
                 });
                 continue;
             }
+            smol::block_on(async {
+                play_url::play_url(&bind, volume, None).compat().await;
+            });
+            continue;
         }
 
         smol::block_on(async {

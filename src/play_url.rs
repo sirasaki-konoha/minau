@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 use crate::input::deinit;
 use crate::{err, input};
 use async_channel::Receiver;
@@ -382,7 +383,6 @@ pub async fn setup_url_player(
                 .ok_or("Samplerate is not available")?;
             let channels = codec_params.channels.ok_or("Channels is not available")?;
             let channels_count = channels.count() as u16;
-
 
             let dec_opts: DecoderOptions = Default::default();
             let decoder = symphonia::default::get_codecs().make(codec_params, &dec_opts)?;

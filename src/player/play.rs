@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 use crate::err;
 use crate::player::player_structs::Player;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -72,7 +73,6 @@ impl Player {
             let mut current_index = 0;
             let mut frames_played = 0u64;
 
-
             let needs_resampling = input_sample_rate != output_sample_rate;
             let mut resampler: Option<SincFixedIn<f32>> = if needs_resampling {
                 let params = SincInterpolationParameters {
@@ -92,9 +92,7 @@ impl Player {
                     chunk_size,
                     channels,
                 ) {
-                    Ok(r) => {
-                        Some(r)
-                    }
+                    Ok(r) => Some(r),
                     Err(e) => {
                         err!("Failed to create resampler: {}", e);
                         None
@@ -219,7 +217,7 @@ impl Player {
                         if current_index % channels == 0 {
                             frames_played += 1;
 
-                            if frames_played % (output_sample_rate as u64) == 0 {
+                            if frames_played.is_multiple_of(output_sample_rate as u64) {
                                 position_clone.store(
                                     frames_played / output_sample_rate as u64,
                                     Ordering::Relaxed,
@@ -323,7 +321,7 @@ impl MusicPlay {
 
         // シーク開始を通知
         self.seeking.store(true, Ordering::Relaxed);
-        
+
         // デコーダースレッドが確実に停止するまで待機
         std::thread::sleep(Duration::from_millis(100));
 
@@ -343,7 +341,7 @@ impl MusicPlay {
 
         // 位置を先に更新してからシーク完了フラグを立てる
         self.position.store(time_secs, Ordering::Relaxed);
-        
+
         // 少し待ってからシーク完了を通知
         std::thread::sleep(Duration::from_millis(50));
         self.seeking.store(false, Ordering::Relaxed);

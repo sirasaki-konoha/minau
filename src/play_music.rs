@@ -18,8 +18,8 @@ use std::thread::sleep;
 use std::time::Duration;
 use unicode_width::UnicodeWidthStr;
 
-const TICK_INTERVAL_MS: u64 = 100;
-const TICKS_PER_SECOND: u32 = 4;
+const TICK_INTERVAL_MS: u64 = 2000;
+const UPDATE_INTERVAL_SECS: u64 = 1; // 1秒ごとに更新
 
 pub async fn play_music<P: AsRef<Path>>(
     path: P,
@@ -83,6 +83,7 @@ fn reset_terminal_title() {
     stdout().flush().unwrap();
 }
 
+
 async fn really_play(
     player: Player,
     metadata: MetaData,
@@ -115,7 +116,8 @@ async fn really_play(
     let duration_secs = duration.as_secs();
     let pb = create_progress_bar(duration_secs);
 
-    let mut tick_count = 0u32;
+    let mut last_update = std::time::Instant::now();
+    let mut last_pos = 0u64;
 
     loop {
         if key_thread.is_finished() {
@@ -131,14 +133,17 @@ async fn really_play(
 
         sleep(Duration::from_millis(TICK_INTERVAL_MS));
 
-        if !music_play.lock().is_paused() {
-            tick_count += 1;
-
-            if tick_count >= TICKS_PER_SECOND {
-                tick_count = 0;
-                let current_secs = music_play.lock().get_pos().as_secs();
+        // 一定間隔でのみプログレスバーを更新
+        if last_update.elapsed() >= Duration::from_secs(UPDATE_INTERVAL_SECS) {
+            let current_secs = music_play.lock().get_pos().as_secs();
+            
+            // 位置が実際に変わった場合のみ更新
+            if current_secs != last_pos {
                 update_progress(&pb, current_secs, duration_secs);
+                last_pos = current_secs;
             }
+            
+            last_update = std::time::Instant::now();
         }
     }
 }

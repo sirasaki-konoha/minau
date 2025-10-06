@@ -104,6 +104,7 @@ impl Player {
 
             let mut resample_buffer = Vec::new();
 
+            // DECODER THREAD
             loop {
                 if finished_clone.load(Ordering::Relaxed) {
                     break;
@@ -112,122 +113,120 @@ impl Player {
                 if seeking_clone.load(Ordering::Relaxed) {
                     current_samples.clear();
                     current_index = 0;
-
-                    // リサンプラーのリセット
                     if let Some(ref mut r) = resampler {
                         r.reset();
                     }
-
                     frames_played =
                         position_clone.load(Ordering::Relaxed) * output_sample_rate as u64;
                     std::thread::sleep(Duration::from_millis(50));
                     continue;
                 }
 
-                // Fill buffer
-                while producer.free_len() > 2048 {
-                    if current_index >= current_samples.len() {
-                        // Decode next packet
-                        let mut format = format.lock().unwrap();
-                        let mut decoder = decoder.lock().unwrap();
+                let free_space = producer.free_len();
 
-                        let packet = match format.next_packet() {
-                            Ok(packet) => packet,
-                            Err(Error::IoError(e))
-                                if e.kind() == std::io::ErrorKind::UnexpectedEof =>
-                            {
-                                finished_clone.store(true, Ordering::Relaxed);
-                                break;
+                if free_space > 2048 {
+                    let mut samples_added = 0;
+                    const MAX_DECODE_PER_CYCLE: usize = 4;
+                    let mut decode_count = 0;
+
+                    while samples_added < free_space && decode_count < MAX_DECODE_PER_CYCLE {
+                        if current_index >= current_samples.len() {
+                            let mut format = format.lock().unwrap();
+                            let mut decoder = decoder.lock().unwrap();
+
+                            let packet = match format.next_packet() {
+                                Ok(packet) => packet,
+                                Err(Error::IoError(e))
+                                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                                {
+                                    finished_clone.store(true, Ordering::Relaxed);
+                                    break;
+                                }
+                                Err(_) => {
+                                    finished_clone.store(true, Ordering::Relaxed);
+                                    break;
+                                }
+                            };
+
+                            if packet.track_id() != track_id {
+                                continue;
                             }
-                            Err(_) => {
-                                finished_clone.store(true, Ordering::Relaxed);
-                                break;
-                            }
-                        };
 
-                        if packet.track_id() != track_id {
-                            continue;
-                        }
+                            match decoder.decode(&packet) {
+                                Ok(decoded) => {
+                                    let samples = convert_samples(decoded);
 
-                        match decoder.decode(&packet) {
-                            Ok(decoded) => {
-                                let samples = convert_samples(decoded);
+                                    if let Some(ref mut resampler) = resampler {
+                                        let chunk_size = resampler.input_frames_next();
 
-                                // リサンプリングが必要な場合
-                                if let Some(ref mut resampler) = resampler {
-                                    let chunk_size = resampler.input_frames_next();
+                                        resample_buffer.extend_from_slice(&samples);
 
-                                    // 既存のバッファと新しいサンプルを結合
-                                    resample_buffer.extend_from_slice(&samples);
+                                        let mut resampled_output = Vec::new();
 
-                                    let mut resampled_output = Vec::new();
-
-                                    // chunk_sizeごとに処理
-                                    while resample_buffer.len() >= chunk_size * channels {
-                                        // チャンネルごとに分離
-                                        let mut channel_data =
-                                            vec![vec![0.0f32; chunk_size]; channels];
-                                        for frame in 0..chunk_size {
-                                            for ch in 0..channels {
-                                                let idx = frame * channels + ch;
-                                                channel_data[ch][frame] = resample_buffer[idx];
-                                            }
-                                        }
-
-                                        // リサンプリング実行（常にNoneを渡す = まだ続きがある）
-                                        match resampler.process(&channel_data, None) {
-                                            Ok(resampled) => {
-                                                // インターリーブ
-                                                let out_frames = resampled[0].len();
-                                                for frame in 0..out_frames {
-                                                    for ch in 0..channels {
-                                                        resampled_output.push(resampled[ch][frame]);
-                                                    }
+                                        while resample_buffer.len() >= chunk_size * channels {
+                                            let mut channel_data =
+                                                vec![vec![0.0f32; chunk_size]; channels];
+                                            for frame in 0..chunk_size {
+                                                for ch in 0..channels {
+                                                    let idx = frame * channels + ch;
+                                                    channel_data[ch][frame] = resample_buffer[idx];
                                                 }
                                             }
-                                            Err(e) => {
-                                                err!("Resampling error: {}", e);
-                                                break;
-                                            }
-                                        }
 
-                                        // 処理済みデータをバッファから削除
-                                        resample_buffer.drain(0..chunk_size * channels);
+                                            match resampler.process(&channel_data, None) {
+                                                Ok(resampled) => {
+                                                    let out_frames = resampled[0].len();
+                                                    for frame in 0..out_frames {
+                                                        for ch in 0..channels {
+                                                            resampled_output
+                                                                .push(resampled[ch][frame]);
+                                                        }
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    err!("Resampling error: {}", e);
+                                                    break;
+                                                }
+                                            }
+
+                                            resample_buffer.drain(0..chunk_size * channels);
+                                        }
+                                        current_samples = resampled_output;
+                                    } else {
+                                        current_samples = samples;
                                     }
 
-                                    current_samples = resampled_output;
-                                } else {
-                                    current_samples = samples;
+                                    current_index = 0;
+                                    decode_count += 1;
                                 }
-
-                                current_index = 0;
+                                Err(_) => continue,
                             }
-                            Err(_) => continue,
                         }
-                    }
 
-                    if current_index < current_samples.len() {
-                        let sample = current_samples[current_index];
-                        if producer.push(sample).is_err() {
-                            break;
-                        }
-                        current_index += 1;
+                        while current_index < current_samples.len() && samples_added < free_space {
+                            let sample = current_samples[current_index];
+                            if producer.push(sample).is_err() {
+                                break;
+                            }
+                            current_index += 1;
+                            samples_added += 1;
 
-                        // フレームカウント（出力サンプルレートベース）
-                        if current_index % channels == 0 {
-                            frames_played += 1;
-
-                            if frames_played.is_multiple_of(output_sample_rate as u64) {
-                                position_clone.store(
-                                    frames_played / output_sample_rate as u64,
-                                    Ordering::Relaxed,
-                                );
+                            if current_index % channels == 0 {
+                                frames_played += 1;
+                                if frames_played.is_multiple_of(output_sample_rate as u64) {
+                                    position_clone.store(
+                                        frames_played / output_sample_rate as u64,
+                                        Ordering::Relaxed,
+                                    );
+                                }
                             }
                         }
                     }
+
+                    std::thread::sleep(Duration::from_millis(5));
+                } else {
+                    std::thread::sleep(Duration::from_millis(10));
                 }
-
-                std::thread::sleep(Duration::from_millis(1));
             }
         });
 

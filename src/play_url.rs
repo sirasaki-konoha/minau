@@ -339,7 +339,6 @@ pub async fn setup_url_player(
             };
 
             if let Some(kind) = infer::get(&detect_buf) {
-                eprintln!("[Decoder] Detected format: {}", kind.mime_type());
                 match kind.mime_type() {
                     "audio/mpeg" => hint.with_extension("mp3"),
                     "audio/flac" => hint.with_extension("flac"),
@@ -384,10 +383,6 @@ pub async fn setup_url_player(
             let channels = codec_params.channels.ok_or("Channels is not available")?;
             let channels_count = channels.count() as u16;
 
-            eprintln!(
-                "[Decoder] Sample rate: {}, Channels: {}",
-                sample_rate, channels_count
-            );
 
             let dec_opts: DecoderOptions = Default::default();
             let decoder = symphonia::default::get_codecs().make(codec_params, &dec_opts)?;

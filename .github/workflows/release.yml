@@ -19,19 +19,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: target/release/minau
-            asset_name: minau
+            asset_name: minau-linux-x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: target/release/minau.exe
-            asset_name: minau.exe
+            asset_name: minau-windows-x86_64.exe
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: target/release/minau
-            asset_name: minau
+            asset_name: minau-macos-x86_64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: target/release/minau
-            asset_name: minau
+            asset_name: minau-macos-aarch64
 
     steps:
       - name: Checkout code
@@ -45,6 +45,7 @@ jobs:
             libasound2-dev \
             pkg-config \
             libssl-dev \
+            zip \
             build-essential
 
       - name: Setup Rust
@@ -68,7 +69,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
@@ -81,11 +82,36 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: strip target/${{ matrix.target }}/release/minau
 
+      - name: Create release directory
+        run: mkdir -p release
+
+      - name: Copy files to release directory (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          copy target\${{ matrix.target }}\release\minau.exe release\
+          copy LICENSE release\
+        shell: cmd
+
+      - name: Copy files to release directory (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp target/${{ matrix.target }}/release/minau release/
+          cp LICENSE release/
+
+      - name: Create ZIP archive (Windows)
+        if: matrix.os == 'windows-latest'
+        run: Compress-Archive -Path release\* -DestinationPath ${{ matrix.asset_name }}.zip
+        shell: pwsh
+
+      - name: Create ZIP archive (Unix)
+        if: matrix.os != 'windows-latest'
+        run: cd release && zip -r ../${{ matrix.asset_name }}.zip *
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: target/${{ matrix.target }}/release/minau${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          path: ${{ matrix.asset_name }}.zip
 
   release:
     name: Create Release

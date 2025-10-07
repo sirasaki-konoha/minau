@@ -427,9 +427,11 @@ pub async fn setup_url_player(
             let device_config = device.default_output_config().unwrap();
 
             let output_sample_rate = device_config.sample_rate().0;
-            
-            eprintln!("[Audio] Source: {}Hz, Device: {}Hz, Channels: {}", 
-                sample_rate, output_sample_rate, channels_count);
+
+            eprintln!(
+                "[Audio] Source: {}Hz, Device: {}Hz, Channels: {}",
+                sample_rate, output_sample_rate, channels_count
+            );
 
             let config = StreamConfig {
                 channels: device_config.channels(),
@@ -444,7 +446,8 @@ pub async fn setup_url_player(
             let format = Arc::new(StdMutex::new(format));
             let decoder = Arc::new(StdMutex::new(decoder));
 
-            let (mut producer, mut consumer) = HeapRb::<f32>::new(output_sample_rate as usize * 2).split();
+            let (mut producer, mut consumer) =
+                HeapRb::<f32>::new(output_sample_rate as usize * 2).split();
 
             let format_clone = Arc::clone(&format);
             let decoder_clone = Arc::clone(&decoder);
@@ -487,14 +490,19 @@ pub async fn setup_url_player(
                             match decoder.decode(&packet) {
                                 Ok(decoded) => {
                                     let raw_samples = convert_samples(decoded);
-                                    
+
                                     // サンプルレート変換
                                     current_samples = if sample_rate != output_sample_rate {
-                                        resample_linear(&raw_samples, sample_rate, output_sample_rate, channels_count as usize)
+                                        resample_linear(
+                                            &raw_samples,
+                                            sample_rate,
+                                            output_sample_rate,
+                                            channels_count as usize,
+                                        )
                                     } else {
                                         raw_samples
                                     };
-                                    
+
                                     current_index = 0;
                                 }
                                 Err(_) => continue,

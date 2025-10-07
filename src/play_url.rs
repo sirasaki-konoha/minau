@@ -31,10 +31,11 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use unicode_width::UnicodeWidthStr;
 
-#[cfg(debug_assertions)]
 macro_rules! eprintln {
     ($($msg: expr), *) => {
-        ::std::eprintln!($($msg), *);
+        if ::std::cfg!(debug_assertions) {
+            ::std::eprintln!($($msg), *);
+        }
     };
 }
 
@@ -70,13 +71,10 @@ impl StreamReader {
         let buffer_clone = Arc::clone(&buffer);
         let eof_clone = Arc::clone(&eof);
 
-        // バックグラウンドスレッドでバッファを満たし続ける
         std::thread::spawn(move || {
             loop {
-                // チャネルからチャンクを受信（ブロッキング）
                 match rx.recv_blocking() {
                     Ok(chunk) => {
-                        // バッファに追加
                         let mut buf = buffer_clone.lock().unwrap();
                         buf.extend(chunk.iter());
                     }
@@ -120,7 +118,6 @@ impl StreamReader {
 impl Read for StreamReader {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         loop {
-            // バッファからデータを取得
             {
                 let mut buffer = self.buffer.lock().unwrap();
                 if !buffer.is_empty() {
@@ -132,12 +129,10 @@ impl Read for StreamReader {
                 }
             }
 
-            // バッファが空の場合
             if self.eof.load(Ordering::Relaxed) {
                 return Ok(0);
             }
 
-            // データが来るまで少し待つ
             if !self.wait_for_data(1, Duration::from_secs(5)) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
@@ -155,6 +150,48 @@ fn convert_samples(buffer: AudioBufferRef) -> Vec<f32> {
     let mut sample_buf = SampleBuffer::<f32>::new(duration as u64, spec);
     sample_buf.copy_interleaved_ref(buffer);
     sample_buf.samples().to_vec()
+}
+
+// シンプルな線形補間リサンプラー
+fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32, channels: usize) -> Vec<f32> {
+    if from_rate == to_rate {
+        return input.to_vec();
+    }
+
+    let ratio = from_rate as f64 / to_rate as f64;
+    let input_frames = input.len() / channels;
+    let output_frames = (input_frames as f64 / ratio).ceil() as usize;
+    let mut output = Vec::with_capacity(output_frames * channels);
+
+    for out_frame in 0..output_frames {
+        let src_pos = out_frame as f64 * ratio;
+        let src_frame = src_pos.floor() as usize;
+        let frac = src_pos - src_frame as f64;
+
+        if src_frame + 1 >= input_frames {
+            // 最後のフレームをそのまま使用
+            for ch in 0..channels {
+                let idx = src_frame * channels + ch;
+                if idx < input.len() {
+                    output.push(input[idx]);
+                } else {
+                    output.push(0.0);
+                }
+            }
+        } else {
+            // 線形補間
+            for ch in 0..channels {
+                let idx1 = src_frame * channels + ch;
+                let idx2 = (src_frame + 1) * channels + ch;
+                let sample1 = input[idx1];
+                let sample2 = input[idx2];
+                let interpolated = sample1 + (sample2 - sample1) * frac as f32;
+                output.push(interpolated);
+            }
+        }
+    }
+
+    output
 }
 
 pub struct UrlPlayer {
@@ -282,15 +319,12 @@ pub async fn setup_url_player(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok());
 
-    // boundedチャネルを使用してバックプレッシャーを適用
     let (tx, rx) = async_channel::bounded::<Bytes>(50);
 
     let downloaded_bytes = Arc::new(Mutex::new(0u64));
     let downloaded_clone = Arc::clone(&downloaded_bytes);
 
-    // 標準スレッドでダウンロードタスクを実行（ランタイム混在を回避）
     std::thread::spawn(move || {
-        // 新しいsmolランタイムを作成
         smol::block_on(async {
             let mut body = response.into_body();
 
@@ -324,7 +358,6 @@ pub async fn setup_url_player(
         move || -> Result<UrlPlayer, Box<dyn std::error::Error + Send + Sync>> {
             let reader = StreamReader::new(rx);
 
-            // 初期バッファリング
             if !reader.wait_for_data(64 * 1024, Duration::from_secs(10)) {
                 return Err("Failed to buffer initial data".into());
             }
@@ -332,7 +365,6 @@ pub async fn setup_url_player(
             let buffered_size = 256 * 1024;
             let mut hint = Hint::new();
 
-            // フォーマット検出
             let detect_buf: Vec<u8> = {
                 let buffer = reader.buffer.lock().unwrap();
                 let detect_size = buffer.len().min(2000);
@@ -392,11 +424,16 @@ pub async fn setup_url_player(
             let device = host
                 .default_output_device()
                 .ok_or("No output device available")?;
-            let deivce_config = device.default_output_config().unwrap();
+            let device_config = device.default_output_config().unwrap();
+
+            let output_sample_rate = device_config.sample_rate().0;
+            
+            eprintln!("[Audio] Source: {}Hz, Device: {}Hz, Channels: {}", 
+                sample_rate, output_sample_rate, channels_count);
 
             let config = StreamConfig {
-                channels: deivce_config.channels(),
-                sample_rate: deivce_config.sample_rate(),
+                channels: device_config.channels(),
+                sample_rate: device_config.sample_rate(),
                 buffer_size: cpal::BufferSize::Default,
             };
 
@@ -407,7 +444,7 @@ pub async fn setup_url_player(
             let format = Arc::new(StdMutex::new(format));
             let decoder = Arc::new(StdMutex::new(decoder));
 
-            let (mut producer, mut consumer) = HeapRb::<f32>::new(sample_rate as usize * 2).split();
+            let (mut producer, mut consumer) = HeapRb::<f32>::new(output_sample_rate as usize * 2).split();
 
             let format_clone = Arc::clone(&format);
             let decoder_clone = Arc::clone(&decoder);
@@ -423,10 +460,8 @@ pub async fn setup_url_player(
                         break;
                     }
 
-                    // Fill buffer
                     while producer.free_len() > 4096 {
                         if current_index >= current_samples.len() {
-                            // Decode next packet
                             let mut format = format_clone.lock().unwrap();
                             let mut decoder = decoder_clone.lock().unwrap();
 
@@ -451,7 +486,15 @@ pub async fn setup_url_player(
 
                             match decoder.decode(&packet) {
                                 Ok(decoded) => {
-                                    current_samples = convert_samples(decoded);
+                                    let raw_samples = convert_samples(decoded);
+                                    
+                                    // サンプルレート変換
+                                    current_samples = if sample_rate != output_sample_rate {
+                                        resample_linear(&raw_samples, sample_rate, output_sample_rate, channels_count as usize)
+                                    } else {
+                                        raw_samples
+                                    };
+                                    
                                     current_index = 0;
                                 }
                                 Err(_) => continue,

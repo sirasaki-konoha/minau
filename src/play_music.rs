@@ -83,7 +83,6 @@ fn reset_terminal_title() {
     stdout().flush().unwrap();
 }
 
-
 async fn really_play(
     player: Player,
     metadata: MetaData,
@@ -136,13 +135,13 @@ async fn really_play(
         // 一定間隔でのみプログレスバーを更新
         if last_update.elapsed() >= Duration::from_secs(UPDATE_INTERVAL_SECS) {
             let current_secs = music_play.lock().get_pos().as_secs();
-            
+
             // 位置が実際に変わった場合のみ更新
             if current_secs != last_pos {
                 update_progress(&pb, current_secs, duration_secs);
                 last_pos = current_secs;
             }
-            
+
             last_update = std::time::Instant::now();
         }
     }

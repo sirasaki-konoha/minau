@@ -31,9 +31,21 @@ A lightweight, efficient command-line music player built with Rust using *sympho
 
 ## Installation
 
-### From crates.io (Recommended)
+### Quick Install (macOS/Linux)
 
-The easiest way to install minau is via cargo:
+The easiest way to install minau on macOS or Linux:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/sirasaki-konoha/minst/refs/heads/master/script/install.sh | sh
+```
+
+### Quick Install (Windows)
+
+Download the latest executable installer from the [releases page](https://github.com/sirasaki-konoha/minst/releases/latest) and run it directly.
+
+### From crates.io
+
+You can also install minau via cargo:
 
 ```bash
 cargo install minau

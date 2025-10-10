@@ -12,12 +12,12 @@
 
 
 
-A lightweight, efficient command-line music player built with Rust using the *rodio* library.
+A lightweight, efficient command-line music player built with Rust using *symphonia* for decoding and *cpal* for audio output.
 
 ## Features
 
 - 🎵 **Simple and Fast** - Minimal overhead, quick startup time
-- 🔊 **Volume Control** - Adjustable playback volume from command line
+- 📊 **Volume Control** - Adjustable playback volume from command line
 - 🎼 **Multiple Format Support** - Supports common audio formats (MP3, WAV, FLAC, OGG, etc.)
 - 🖼️ **Album Art Display** - View album artwork during playback with GUI mode
 - 💻 **Cross-platform** - Works on Windows, macOS, and Linux
@@ -182,12 +182,14 @@ minau album.flac --gui --volume 60
 
 ## Supported Audio Formats
 
-minau supports a wide range of audio formats through the rodio library:
+minau supports a wide range of audio formats through the symphonia library:
 
 - MP3
 - WAV
 - FLAC
 - OGG Vorbis
+- AAC
+- And many more formats supported by symphonia
 
 ## Requirements
 
@@ -196,6 +198,14 @@ minau supports a wide range of audio formats through the rodio library:
 - A system audio output device
 - Cross-platform support: Windows, macOS, and Linux
 
+## Architecture
+
+minau uses a modular architecture with direct audio processing:
+
+- **symphonia** - High-performance audio decoding library supporting various formats
+- **cpal** - Cross-platform audio library for low-latency audio output
+- Direct audio pipeline for minimal overhead and maximum performance
+
 ## Performance
 
 minau is designed to be lightweight and efficient:
@@ -203,6 +213,7 @@ minau is designed to be lightweight and efficient:
 - Fast startup time
 - Minimal memory footprint
 - Low CPU usage during playback
+- Direct audio pipeline without unnecessary abstractions
 - Suitable for resource-constrained environments (e.g., embedded systems, older hardware)
 
 ## Contributing
@@ -221,4 +232,3 @@ This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICE
 ---
 
 **Note:** Use keyboard controls during playback for pause/play, volume adjustment, and track navigation.
-
